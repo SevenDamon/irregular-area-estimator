@@ -1,5 +1,7 @@
 # 不规则图形面积估测器 v12（课堂试验版）
 
+试用地址：https://sevendamon.github.io/irregular-area-estimator/
+
 ## 使用
 
 1. 用安卓手机或平板的系统浏览器打开部署后的 HTTPS 网址。直接点击 `index.html` 得到的 `file://` / `content://` 地址无法加载自动识别模型。

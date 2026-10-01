@@ -432,8 +432,8 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
       <li>边缘漏识别时，点【涂抹修边】局部补进或擦掉；整条轮廓认错时再用【逐点重描】</li>
       <li>轮廓贴合后点【确认结果】，再切到【数格子】看满格／不满格，并用 1/2/3cm 比较</li>
     </ol>
-    <p class="hint" style="margin-top:14px">认错了怎么办：点【调整纸边】拖动四个角；点【描轮廓】沿物体边缘依次点一圈。</p>
-    <p class="hint">手形自动轮廓若不完整，请重拍；背景容差仅用于其他物体。纸角被遮挡时需估计，面积误差可能较大。轮廓参考面积不是实物面积的独立真值。不支持透明、反光、带洞物体。</p>
+    <p class="hint" style="margin-top:14px">认错了怎么办：点【调整纸边】拖动四个角；自动手形不完整就重拍。其他物体可以点【描轮廓】手动沿边缘点一圈。</p>
+    <p class="hint">背景容差仅用于其他物体。纸角被遮挡时请重拍，否则面积误差可能较大。轮廓参考面积不是实物面积的独立真值。不支持透明、反光、带洞物体。</p>
     <div class="sheet-btns"><button class="b-plain" id="btnHelpClose">知道了</button></div>
   </div>
 </div>
@@ -454,7 +454,7 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
 <script>
 /* =====================================================================
    手掌面积估测器
-   纯前端单文件 · 零依赖 · 可离线 · 图像处理全部本地完成
+   纯前端静态网页 · 模型随网页提供 · 首次缓存后可离线 · 图像处理全部本地完成
    ===================================================================== */
 
 /* ---------------- 常量区（要调参数就改这里） ---------------- */
@@ -1721,7 +1721,7 @@ function aftershape(){
   /* 自检：多边形自交时鞋带面积会远大于实际填充面积 */
   var sh=polyArea(S.poly)/(CFG.PX_PER_CM*CFG.PX_PER_CM);
   if(sh>a*1.3){
-    toast('轮廓没追踪对，点【描轮廓】用手指沿手掌边缘描一圈',5200);
+    toast(S.kind==='hand'?'手形轮廓异常，请重拍': '轮廓没追踪对，点【描轮廓】沿物体边缘描一圈',5200);
     return;
   }
   if(S.kind==="hand"&&(a<CFG.AREA_MIN||a>CFG.AREA_MAX)){
@@ -3021,7 +3021,7 @@ $('btnEditOk').onclick=confirmEditor;
 $('btnEditUndo').onclick=function(){if(ED.history.length){ED.pts=ED.history.pop();ED.dirty=true;drawEditor();}};
 $('btnVerify').onclick=function(){
   if(!S.stat||!S.paperConfirmed)return;
-  if(!simplePolygon(S.poly)){toast('轮廓边线交叉，请描轮廓修正',3200);return;}
+  if(!simplePolygon(S.poly)){toast(S.kind==='hand'?'手形轮廓交叉，请重拍':'轮廓边线交叉，请描轮廓修正',3200);return;}
   S.confirmed=true;dstage('完成');dlg('用户已核对纸角与物体轮廓；面积为当前轮廓估算。');updatePanel();
 };
 $('kindSeg').onclick=function(e){var b=e.target.closest('button');if(!b)return;S.kind=b.getAttribute('data-kind');
@@ -3062,7 +3062,7 @@ window.__BUILD='v12 · 2026-10-02 · 自动手形试验版';
   var w=$('appWarn');
   w.innerHTML='<b>检测到应用内浏览器标识。</b>'+
     '如果拍照和相册按钮没有反应，请先试下面的备用入口；'+
-    '备用文件框也无反应时，再尝试用系统浏览器或 Chrome 打开同一份本地 HTML。';
+    '备用文件框也无反应时，再尝试用系统浏览器或 Chrome 打开同一个 HTTPS 网页地址。';
   w.style.display='block';
 })();
 
