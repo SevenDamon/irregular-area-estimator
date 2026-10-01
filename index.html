@@ -287,7 +287,7 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
         <li>别开闪光灯，避免物体或平板在纸上投下大片阴影</li>
       </ul>
     </details>
-    <p class="build" id="build">v12 · 2026-10-02 · 自动手形试验版 · 需通过网页地址打开</p>
+    <p class="build" id="build">v12.1 · 2026-10-02 · 自动手形试验版 · 需通过网页地址打开</p>
   </div>
 </section>
 
@@ -346,6 +346,13 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
           <button data-f="all" class="on">全部</button>
           <button data-f="full">满格</button>
           <button data-f="part">不满格</button>
+        </div>
+      </div>
+      <div class="row">
+        <label>边缘上色</label>
+        <div class="seg" id="partStyleSeg" aria-label="不满格的显示方式">
+          <button data-style="hatch" class="on" aria-pressed="true">斜线区分</button>
+          <button data-style="solid" aria-pressed="false">同色填充</button>
         </div>
       </div>
       <div class="row checks">
@@ -431,6 +438,7 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
       <li>手形由模型自动识别并自动截腕；A4 纸角若找错，拖动四角到真实纸角后即可重算</li>
       <li>边缘漏识别时，点【涂抹修边】局部补进或擦掉；整条轮廓认错时再用【逐点重描】</li>
       <li>轮廓贴合后点【确认结果】，再切到【数格子】看满格／不满格，并用 1/2/3cm 比较</li>
+      <li>【边缘上色】可选“斜线区分”或“同色填充”；只改变颜色，不改变满格、不满格判定或面积</li>
     </ol>
     <p class="hint" style="margin-top:14px">认错了怎么办：点【调整纸边】拖动四个角；自动手形不完整就重拍。其他物体可以点【描轮廓】手动沿边缘点一圈。</p>
     <p class="hint">背景容差仅用于其他物体。纸角被遮挡时请重拍，否则面积误差可能较大。轮廓参考面积不是实物面积的独立真值。不支持透明、反光、带洞物体。</p>
@@ -573,6 +581,7 @@ var S = {
   integral: null,      // mask 的积分图
   gridCm: 1,
   viewMode: 'shape',
+  partStyle: 'hatch',  // 不满格用斜线或同色实心；只影响显示，不改统计
   tolan: 30,
   filter: 'all',
   showPhoto: true,
@@ -1864,10 +1873,8 @@ function drawWristLine(s){
 function drawCells(){
   var st=S.stat; if(!st) return;
   var cp=st.cellPx, r, c, k, idx, i;
-  /* 关键：色块按手掌轮廓裁掉。
-     以前是把整个格子涂成实心方块 —— 画出来是一片方方正正的色块，
-     一点都不像手掌，学生也看不出"这格只盖了一半"。
-     按轮廓裁过之后，只有被手掌盖住的那部分着色，这才是课本里数方格的样子。 */
+  /* 两种上色都保留真实轮廓：仅轮廓内着色，避免手形退化为一堆方块。
+     同色模式把不满格的已覆盖部分也涂成满格同款橙色；分类与面积不变。 */
   var clip=S.poly;
   var doClip=clip&&clip.length>=3;
   if(doClip){
@@ -1890,14 +1897,13 @@ function drawCells(){
         vctx.fillStyle='#EF9F27';        /* 满格：实心橙 */
         vctx.fillRect(x,y,cp,cp);
       }else{
-        vctx.fillStyle='#FDF1DC';        /* 不满格：浅底 + 斜纹 */
+        vctx.fillStyle=S.partStyle==='solid'?'#EF9F27':'#FDF1DC';
         vctx.fillRect(x,y,cp,cp);
-        if(onFilter) offs.push([x,y]);
+        if(S.partStyle==='hatch'&&onFilter) offs.push([x,y]);
       }
     }
   }
-  /* 不满格加斜纹。教材里就是这么区分"数满格"和"估不满格"的。
-     只靠颜色深浅根本不行——平板缩略图上一片橘，学生分不出哪个是满格。 */
+  /* 斜线模式中，不满格有独立的视觉编码；同色模式由「只看」筛选辨别分类。 */
   if(offs.length){
     var step=Math.max(3.2,cp/3.2);
     vctx.save();
@@ -2785,7 +2791,7 @@ function buildCard(){
   var y2=y+140+CFG.GRIDS.length*66+16;
   c.fillStyle='#0F6E56'; c.font='400 26px sans-serif';
   c.fillText('轮廓参考面积：'+fmt(st.exact,1)+' cm²　'+
-    '　实心=满格　斜纹=不满格',64,y2);
+    (S.partStyle==='solid'?'边缘同色填充；不满格仍按 0.5 格估算':'实心=满格　斜纹=不满格'),64,y2);
 
   showScreen('card');
 }
@@ -2991,6 +2997,15 @@ $('filterSeg').onclick=function(e){
   var b=e.target.closest('button'); if(!b) return;
   setFilter(b.getAttribute('data-f'));
 };
+$('partStyleSeg').onclick=function(e){
+  var b=e.target.closest('button');if(!b)return;
+  var style=b.getAttribute('data-style');if(style!=='hatch'&&style!=='solid')return;
+  S.partStyle=style;
+  Array.prototype.forEach.call(this.children,function(x){
+    var active=x===b;x.classList.toggle('on',active);x.setAttribute('aria-pressed',active?'true':'false');
+  });
+  render();
+};
 $('tol').oninput=function(){ onTolInput(+this.value); };
 $('wrist').oninput=function(){ onWristInput(+this.value); };
 $('chkPhoto').onchange=function(){ S.showPhoto=this.checked; render(); };
@@ -3054,7 +3069,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:' || location.hos
 
 /* ---------------- 启动自检：内置浏览器预警 ---------------- */
 /* 某些应用内浏览器不处理文件选择；UA 仅能提示环境，不能证明失败原因。 */
-window.__BUILD='v12 · 2026-10-02 · 自动手形试验版';
+window.__BUILD='v12.1 · 2026-10-02 · 自动手形试验版';
 (function(){
   var ua=navigator.userAgent||'';
   var inApp=/MicroMessenger|QQ\/|DingTalk|Weibo|AlipayClient|Lark|Feishu|Wework/i.test(ua);
