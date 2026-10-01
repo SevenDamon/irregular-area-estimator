@@ -1,0 +1,14 @@
+{
+  "name": "不规则图形面积估测器",
+  "short_name": "面积估测器",
+  "description": "A4 纸标定与自动手形分割的课堂面积估测工具",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f2ee",
+  "theme_color": "#f3f2ee",
+  "icons": [
+    {"src":"./icon-192.png","sizes":"192x192","type":"image/png"},
+    {"src":"./icon-512.png","sizes":"512x512","type":"image/png"}
+  ]
+}

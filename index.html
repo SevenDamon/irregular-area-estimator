@@ -1,0 +1,3074 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#f3f2ee">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon-192.png" type="image/png">
+<title>不规则图形面积估测器</title>
+<style>
+:root{
+  --ink:#2C2C2A; --ink2:#5F5E5A; --ink3:#8A8880;
+  --line:#D3D1C7; --line2:#B4B2A9;
+  --bg:#F3F2EE; --card:#FFFFFF; --sunk:#EAE8E2;
+  --amber:#EF9F27; --amber-lt:#FBEED6; --amber-dk:#7A4A0A;
+  --teal:#0F6E56; --teal-lt:#E1F5EE;
+  --accent:#185FA5; --accent-lt:#E6F1FB;
+  --r:14px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--ink);font-size:16px;line-height:1.5;
+  -webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%}
+button{font-family:inherit;font-size:inherit;color:inherit;border:none;background:none;cursor:pointer}
+.screen{position:fixed;inset:0;display:none;flex-direction:column}
+.screen.on{display:flex}
+
+/* ---------- 首页 ---------- */
+#home{align-items:center;justify-content:center;padding:24px;overflow:auto}
+.home-wrap{width:100%;max-width:520px;text-align:center}
+.home-wrap h1{font-size:26px;font-weight:500;margin:0 0 6px;letter-spacing:.5px}
+.home-wrap .sub{color:var(--ink2);font-size:15px;margin:0 0 28px}
+.home-btns{display:flex;flex-direction:column;gap:14px}
+.big{display:block;width:100%;min-height:64px;border-radius:var(--r);
+  background:var(--card);border:1px solid var(--line);
+  font-size:19px;font-weight:500;transition:transform .06s}
+/* 触发文件选择的两个按钮必须是 <label>：label→input 是浏览器原生行为，
+   比 JS 调 input.click() 兼容得多。按钮文字需要自己居中 */
+label.big{display:flex;align-items:center;justify-content:center;
+  text-align:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+/* 主按钮使用「屏幕外隐藏 + label」；备用入口保留浏览器原生文件框。
+   ⚠ 不要凭理论改回「铺满按钮」式（position:absolute + w/h:100% + opacity:0 + appearance:none）。
+     同一台安卓设备、同一个浏览器下的 A/B 实测：铺满式点不动，这种写法能正常唤相机。 */
+.sr-only{position:absolute;left:-9999px;top:0;width:1px;height:1px;
+  opacity:0;overflow:hidden;pointer-events:none}
+.big:active{transform:scale(.985)}
+.big.primary{background:var(--accent);border-color:var(--accent);color:#fff;
+  box-shadow:0 2px 0 #0C447C}
+.big.ghost{background:transparent;border-style:dashed;color:var(--ink2);font-size:17px}
+.fallback-tip{margin:14px 2px 0;font-size:13px;line-height:1.6;color:var(--ink2);text-align:center}
+/* 版本号：出问题时报给我，我能立刻判断手机上的是不是旧文件 */
+.build{margin:18px 0 0;font-size:11px;letter-spacing:.4px;color:#B4B2A9}
+/* 微信/QQ 等内置浏览器会静默屏蔽 file input，点按钮必然没反应，必须当场告诉用户 */
+.app-warn{display:none;margin:16px 0 0;padding:13px 16px;border-radius:12px;
+  background:#FFF4E0;border:1px solid #E8C88A;color:#7A4B00;
+  font-size:14px;line-height:1.65;text-align:left}
+.app-warn b{display:block;margin-bottom:4px;font-size:15px;color:#5C3800}
+.tip{margin-top:26px;text-align:left;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--r);padding:14px 16px;font-size:14px;color:var(--ink2)}
+.tip summary{font-weight:500;color:var(--ink);cursor:pointer;font-size:15px}
+.tip ul{margin:10px 0 0;padding-left:20px}
+.tip li{margin:6px 0}
+
+/* ---------- 诊断抽屉：识别失败时把"到底哪一步挂了"摆出来，不用猜 ---------- */
+#diag{position:fixed;left:0;right:0;bottom:0;z-index:60;display:none;
+  background:#2C2C2A;color:#EDECE6;border-radius:16px 16px 0 0;
+  box-shadow:0 -8px 24px rgba(0,0,0,.28);max-height:52vh;flex-direction:column}
+#diag.on{display:flex}
+.dg-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;
+  padding:12px 14px;border-bottom:1px solid #454440}
+.dg-head b{flex:1;font-size:15px;color:#fff;font-weight:500}
+.dg-head button{font:inherit;font-size:13px;padding:7px 12px;border-radius:9px;
+  border:1px solid #5A5954;background:#3C3B37;color:#EDECE6}
+.dg-head button:active{background:#4A4944}
+.dg-body{flex:1;overflow:auto;margin:0;padding:12px 14px 18px;
+  font:12px/1.65 ui-monospace,Consolas,monospace;white-space:pre-wrap;
+  word-break:break-all;color:#CFCEC7;-webkit-user-select:text;user-select:text}
+.dg-body em{color:#F5A623;font-style:normal}
+
+/* ---------- 顶栏 ---------- */
+.bar{flex:0 0 auto;height:56px;display:flex;align-items:center;gap:8px;
+  padding:0 10px;background:var(--card);border-bottom:1px solid var(--line)}
+.bar-title{flex:1;font-weight:500;font-size:17px;text-align:center}
+.icon{width:44px;height:44px;border-radius:10px;font-size:20px;color:var(--ink2);
+  display:flex;align-items:center;justify-content:center}
+.icon:active{background:var(--sunk)}
+
+/* ---------- 工作区 ---------- */
+.work-body{flex:1;display:flex;min-height:0}
+.stage{flex:1;position:relative;min-width:0;background:#E6E4DE;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none}
+#view{display:block;touch-action:none}
+.stage-legend{position:absolute;left:12px;top:12px;display:flex;gap:4px;z-index:2;
+  background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:10px;
+  padding:4px;font-size:13px;color:var(--ink2)}
+.stage-legend button{min-height:34px;padding:0 10px;border-radius:7px;font-size:13px;color:var(--ink2)}
+.stage-legend button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.16)}
+.sw{width:15px;height:15px;border-radius:3px;display:inline-block}
+.sw.full{background:var(--amber);border:1px solid var(--amber-dk)}
+.sw.part{background:#FDF1DC;border:1px solid var(--amber);
+  background-image:repeating-linear-gradient(45deg,#E3A03A 0 2px,transparent 2px 6px)}
+.stage-float{position:absolute;right:12px;bottom:12px;max-width:60%;
+  background:rgba(44,44,42,.9);color:#fff;border-radius:10px;padding:8px 12px;
+  font-size:13px;line-height:1.5;display:none;pointer-events:none}
+.stage-float.on{display:block}
+
+/* ---------- 侧栏 ---------- */
+.panel{flex:0 0 306px;background:var(--card);border-left:1px solid var(--line);
+  padding:14px;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+/* 保持按钮在面板内容末尾，避免手机窄屏时遮住腕线和格子控件。 */
+#btnCard{position:static}
+.stat-main{background:var(--amber-lt);border:1px solid var(--amber);border-radius:var(--r);
+  padding:10px 14px;text-align:center}
+.stat-label{font-size:13px;color:var(--amber-dk)}
+.stat-value{font-size:36px;font-weight:500;color:var(--amber-dk);line-height:1.15;
+  font-variant-numeric:tabular-nums}
+.stat-value em{font-size:15px;font-style:normal;margin-left:3px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat-grid>div{background:var(--sunk);border-radius:10px;padding:7px 11px;
+  display:flex;flex-direction:column;gap:1px}
+.stat-grid span{font-size:12px;color:var(--ink2);line-height:1.3}
+.stat-grid b{font-size:19px;font-weight:500;line-height:1.25;font-variant-numeric:tabular-nums}
+.shape-warning{display:none;margin:0;padding:9px 11px;border-radius:9px;
+  background:#FFF3DD;border:1px solid #DEA93B;color:#674A18;font-size:13px;line-height:1.5}
+.row{display:flex;align-items:center;gap:9px}
+.row>label{flex:0 0 62px;font-size:14px;color:var(--ink2)}
+.seg{flex:1;display:flex;background:var(--sunk);border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;min-height:38px;border-radius:8px;font-size:14px;color:var(--ink2)}
+.seg button.on{background:var(--card);color:var(--ink);font-weight:500;
+  box-shadow:0 1px 2px rgba(0,0,0,.09)}
+input[type=range]{flex:1;height:34px;-webkit-appearance:none;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:5px;border-radius:3px;background:var(--line2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;
+  border-radius:50%;background:var(--card);border:2px solid var(--accent);margin-top:-11px}
+.row>span#tolVal{flex:0 0 34px;text-align:right;font-size:14px;color:var(--ink2);
+  font-variant-numeric:tabular-nums}
+.checks{gap:16px}
+.chk{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ink2)}
+.chk input{width:19px;height:19px;accent-color:var(--accent)}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sm{min-height:46px;border-radius:10px;background:var(--sunk);border:1px solid var(--line);
+  font-size:14px;color:var(--ink)}
+.sm:active{background:var(--line)}
+.panel>.big{min-height:56px;font-size:17px}
+
+/* ---------- 通用弹层 ---------- */
+.sheet{position:fixed;inset:0;background:rgba(44,44,42,.45);display:none;
+  align-items:center;justify-content:center;padding:18px;z-index:20}
+.sheet.on{display:flex}
+.sheet-card{background:var(--card);border-radius:18px;padding:18px;width:100%;
+  max-width:640px;max-height:100%;overflow:auto}
+.sheet-card h2{font-size:18px;font-weight:500;margin:0 0 4px}
+.sheet-card p.hint{font-size:13.5px;color:var(--ink2);margin:0 0 14px}
+.sheet-btns{display:flex;gap:10px;margin-top:14px}
+.sheet-btns button{flex:1;min-height:52px;border-radius:12px;font-size:16px;font-weight:500}
+.b-primary{background:var(--accent);color:#fff}
+.b-plain{background:var(--sunk);color:var(--ink);border:1px solid var(--line)}
+#editWrap{position:relative;background:#22221F;border-radius:12px;overflow:hidden;
+  touch-action:none;display:flex;align-items:center;justify-content:center}
+#editCanvas{display:block;touch-action:none}
+#brushWrap{height:min(54vh,520px);overflow:auto;background:#ECEAE5;border-radius:10px}
+#brushCanvas{display:block;max-width:none;touch-action:none}
+.brush-modes{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:8px 0}
+.brush-modes button{min-height:40px;border-radius:8px;background:var(--sunk);color:var(--ink2)}
+.brush-modes button.on{background:#FFF3DD;color:#714707;border:1px solid #DEA93B;font-weight:600}
+.brush-options{display:flex;align-items:center;gap:8px;margin:8px 0;color:var(--ink2);font-size:13px}
+.brush-options input{min-width:0}
+.brush-options button{min-width:46px;min-height:36px;border-radius:7px;background:var(--sunk)}
+
+/* ---------- 忙碌 / 提示 ---------- */
+#busy{position:fixed;inset:0;background:rgba(243,242,238,.93);display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:40}
+#busy.on{display:flex}
+.spin{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);
+  border-radius:50%;animation:sp .9s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#busyTxt{font-size:16px;color:var(--ink2)}
+#toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(20px);
+  background:rgba(44,44,42,.93);color:#fff;border-radius:12px;padding:12px 20px;
+  font-size:15px;max-width:84%;text-align:center;opacity:0;pointer-events:none;
+  transition:.22s;z-index:50;line-height:1.5}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ---------- 三档对比 ---------- */
+.cmp-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.cmp-row:last-child{border-bottom:none}
+.cmp-row.sel{background:var(--accent-lt);border-radius:8px;padding:9px 10px}
+.cmp-tag{flex:0 0 52px;font-size:15px;font-weight:500}
+.cmp-num{flex:0 0 96px;text-align:right;font-size:17px;font-weight:500;
+  font-variant-numeric:tabular-nums}
+.cmp-bar{flex:1;height:22px;background:var(--sunk);border-radius:5px;position:relative;overflow:hidden}
+.cmp-fill{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:5px}
+.cmp-fill.dim{background:var(--line2)}
+.cmp-err{flex:0 0 74px;text-align:right;font-size:14px;color:var(--ink2);
+  font-variant-numeric:tabular-nums}
+.base-line{display:flex;align-items:center;gap:10px;padding:10px 0 4px;
+  border-top:2px dashed var(--teal);margin-top:6px}
+.base-line .cmp-tag{color:var(--teal)}
+.cmp-note{font-size:13px;color:var(--ink2);margin-top:12px;line-height:1.6}
+
+/* ---------- 结果卡片 ---------- */
+#card{background:#22221F;align-items:center;justify-content:center;padding:12px;padding-top:68px}
+#cardCanvas{max-width:100%;max-height:100%;border-radius:10px;background:#fff}
+.card-topbar{position:absolute;top:0;left:0;right:0;padding:10px 12px;display:flex;
+  align-items:center;gap:10px;background:rgba(34,34,31,.86);color:#fff;z-index:5}
+.card-topbar .t{flex:1;font-size:14px;text-align:center;color:#DEDCD5}
+.card-topbar .icon{color:#fff}
+
+@media (max-width:900px){
+  .work-body{flex-direction:column}
+  .panel{flex:0 0 auto;max-height:52%;border-left:none;border-top:1px solid var(--line)}
+  .stage{flex:1 1 48%}
+}
+/* 手机横屏：必须改回左右布局。上下布局会把画布压到 160px 高，格子完全看不清 */
+@media (max-width:960px) and (orientation:landscape) and (max-height:520px){
+  .work-body{flex-direction:row}
+  .stage{flex:1 1 auto;height:auto}
+  .panel{flex:0 0 286px;max-height:none;border-left:1px solid var(--line);
+    border-top:none;overflow-y:auto;padding:10px;gap:8px}
+  .stat-main{padding:6px 10px}
+  .stat-value{font-size:29px}
+  .stat-grid>div{padding:5px 9px}
+  .stat-grid b{font-size:16px}
+}
+
+/* 小屏：toast 默认贴屏幕底部，正好压住面板里要拖的那个滑块。
+   挪到标题栏下方——挡住的是画布，不是正在操作的控件。 */
+@media (max-width:900px){ #toast{bottom:auto;top:56px} }
+/* 诊断抽屉打开时，别让 toast 被压在抽屉下面 */
+body.dg-on #toast{bottom:calc(52vh + 14px)}
+@media (max-width:900px){ body.dg-on #toast{bottom:auto;top:56px} }
+button:disabled{opacity:.45;cursor:default}
+.result-status{margin:0;font-size:13px;color:var(--ink2);line-height:1.5}
+select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:white}
+#editSheet{z-index:65}
+.sheet-btns{flex-wrap:wrap}.sheet-btns button{min-width:90px}
+.entry-status{font-size:13px;color:var(--ink2);margin:8px 0}
+.native-title{display:block;font-size:14px;font-weight:600;margin-top:10px}
+#nativeEntry input[type=file]{display:block;position:static;left:auto;top:auto;opacity:1;
+  pointer-events:auto;width:100%;height:auto;font:15px sans-serif;padding:12px;
+  margin:4px 0 14px;border:1px solid var(--line);border-radius:8px;background:white}
+.native-note{font-size:13px;color:var(--ink2)}
+</style>
+</head>
+<body>
+
+<!-- ================= 首页 ================= -->
+<section id="home" class="screen on">
+  <div class="home-wrap">
+    <h1>不规则图形面积估测器</h1>
+    <p class="sub">拍手部照片；必要时校正 A4 四角，手形与面积自动生成</p>
+    <div class="row" style="margin-bottom:18px">
+      <label>测什么</label><div class="seg" id="kindSeg">
+        <button data-kind="hand" class="on">手</button><button data-kind="object">树叶／纸片</button>
+      </div></div><div class="home-btns">
+      <label class="big primary" for="fileShoot" id="btnShoot">拍一张</label>
+      <label class="big" for="filePick" id="btnPick">从相册选择</label>
+      <input type="file" id="fileShoot" class="sr-only"
+             accept="image/*" capture="environment">
+      <input type="file" id="filePick" class="sr-only" accept="image/*">
+      <button class="big ghost" id="btnDemo">用示例物体试数格子</button>
+    </div>
+    <p class="fallback-tip">按钮没弹出相机或相册时，请打开下面的「备用入口」。</p>
+    <p class="entry-status" id="entryStatus" role="status">等待选择照片</p>
+    <details class="tip" id="nativeEntry">
+      <summary>拍照／相册没反应？打开备用入口</summary>
+      <p>直接点浏览器自己的文件框。这一步能区分按钮触发与浏览器文件选择功能是否可用。</p>
+      <label class="native-title" for="fileShootDirect">直接拍照</label>
+      <input type="file" id="fileShootDirect" accept="image/*" capture="environment">
+      <label class="native-title" for="filePickDirect">直接选照片</label>
+      <input type="file" id="filePickDirect" accept="image/*">
+      <p class="native-note">如果这两个原生文件框也没反应，请记下地址栏开头及浏览器名称。这说明故障发生在网页取得照片之前。</p>
+    </details>
+    <div class="app-warn" id="appWarn">
+      <b>这是在内置浏览器里打开的，点按钮不会有反应。</b>
+      微信 / QQ / 钉钉等内置浏览器可能拦截相机或相册。
+      请点右上角「···」→「在浏览器打开」，再用【拍一张】。
+    </div>
+    <details class="tip">
+      <summary>怎么拍才准（点开看）</summary>
+      <ul>
+        <li>白纸平铺在<strong>深色桌面</strong>上，最好垫一块深色垫板，纸边才认得出来</li>
+        <li>每次放<strong>一个</strong>与白纸有明显色差的物体；测手时，五指自然张开</li>
+        <li>物体要完整留在纸内；测手时只让前臂越过纸边。纸必须是 <strong>21×29.7cm 的 A4</strong></li>
+        <li>从<strong>正上方</strong>拍，尽量让白纸四角完整入镜；遮挡的纸角只能估计，面积误差会增大</li>
+        <li>别开闪光灯，避免物体或平板在纸上投下大片阴影</li>
+      </ul>
+    </details>
+    <p class="build" id="build">v12 · 2026-10-02 · 自动手形试验版 · 需通过网页地址打开</p>
+  </div>
+</section>
+
+<!-- ================= 工作屏 ================= -->
+<section id="work" class="screen">
+  <header class="bar">
+    <button class="icon" id="btnHome" title="返回">←</button>
+    <div class="bar-title" id="barTitle">不规则图形面积估测器</div>
+    <button class="icon" id="btnDiag" title="这次是怎么算的">ⓘ</button>
+    <button class="icon" id="btnHelp" title="帮助">?</button>
+  </header>
+  <div class="work-body">
+    <div class="stage" id="stage">
+      <canvas id="view"></canvas>
+      <div class="stage-legend" id="viewSeg" aria-label="显示方式">
+        <button data-view="shape" class="on">看手形</button>
+        <button data-view="grid">数格子</button>
+      </div>
+      <div class="stage-float" id="cellInfo"></div>
+    </div>
+    <aside class="panel">
+      <div class="stat-main">
+        <div class="stat-label" id="areaLabel">估算面积</div>
+        <div class="stat-value"><span id="areaVal">--</span><em>cm²</em></div>
+      </div>
+      <div class="stat-grid">
+        <div><span>满格</span><b id="fullCnt">--</b></div>
+        <div><span>不满格</span><b id="partCnt">--</b></div>
+        <div><span>合计格数</span><b id="cellCnt">--</b></div>
+        <div><span>轮廓参考面积 cm²</span><b id="exactVal">--</b></div>
+      </div>
+      <p class="shape-warning" id="shapeWarning" role="status"></p>
+      <p id="resultStatus" class="result-status" role="status">请先选择照片</p>
+      <button class="sm" id="btnVerify" disabled>轮廓贴合，确认结果</button>
+      <div class="row">
+        <label>格子边长</label>
+        <div class="seg" id="gridSeg">
+          <button data-cm="1" class="on">1cm</button>
+          <button data-cm="2">2cm</button>
+          <button data-cm="3">3cm</button>
+        </div>
+      </div>
+      <div class="row" id="tolRow">
+        <label>背景容差（仅其他物体）</label>
+        <input type="range" id="tol" min="0" max="60" value="30">
+        <span id="tolVal">30</span>
+      </div>
+      <div class="row" id="wristRow">
+        <label>截掉手臂（手形自动）</label>
+        <input type="range" id="wrist" min="0" max="100" value="100">
+        <span id="wristVal">自动</span>
+      </div>
+      <div class="row">
+        <label>只看</label>
+        <div class="seg" id="filterSeg">
+          <button data-f="all" class="on">全部</button>
+          <button data-f="full">满格</button>
+          <button data-f="part">不满格</button>
+        </div>
+      </div>
+      <div class="row checks">
+        <label class="chk"><input type="checkbox" id="chkPhoto" checked>叠加照片</label>
+        <label class="chk"><input type="checkbox" id="chkCoord" checked>行列标号</label>
+        <label class="chk"><input type="checkbox" id="chkEdit">修改格子</label>
+      </div>
+      <div class="btns">
+        <button class="sm" id="btnCorners">调整纸边</button>
+        <button class="sm" id="btnBrush">涂抹修边</button>
+        <button class="sm" id="btnTrace">逐点重描</button>
+        <button class="sm" id="btnCompare">三档对比</button>
+        <button class="sm" id="btnUndo">撤销改动</button>
+      </div>
+      <button class="big primary" id="btnCard">生成结果卡片</button>
+    </aside>
+  </div>
+</section>
+
+<!-- ================= 结果卡片 ================= -->
+<section id="card" class="screen">
+  <div class="card-topbar">
+    <button class="icon" id="btnCardBack">←</button>
+    <div class="t">按住 电源键 + 音量减 截图保存，或点右上角保存</div>
+    <button class="icon" id="btnCardSave" title="保存图片">⤓</button>
+  </div>
+  <canvas id="cardCanvas"></canvas>
+</section>
+
+<!-- ================= 弹层：编辑（纸边 / 轮廓） ================= -->
+<div class="sheet" id="editSheet">
+  <div class="sheet-card">
+    <h2 id="editTitle">调整</h2>
+    <p class="hint" id="editHint"></p>
+    <div id="paperOrientation" class="row" style="margin-bottom:10px"><label>纸的长边</label>
+      <select id="paperDirection"><option value="portrait">左边／右边（竖放）</option><option value="landscape">上边／下边（横放）</option></select>
+    </div>
+    <div id="editWrap"><canvas id="editCanvas"></canvas></div>
+    <div class="sheet-btns">
+      <button class="b-plain" id="btnEditReset">重来</button><button class="b-plain" id="btnEditUndo">撤回一点</button>
+      <button class="b-plain" id="btnEditCancel">取消</button>
+      <button class="b-primary" id="btnEditOk">完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 弹层：局部补漏 / 擦除 ================= -->
+<div class="sheet" id="brushSheet">
+  <div class="sheet-card">
+    <h2>局部修边</h2>
+    <p class="hint" id="brushHint">橙色是当前计入面积的区域。少了一块就选【补进】涂上；把纸或阴影算进去了就选【擦掉】。点【移动】可拖动画面。</p>
+    <div class="brush-modes" id="brushModes">
+      <button data-brush="add" class="on">补进手部</button>
+      <button data-brush="erase">擦掉多余</button>
+      <button data-brush="pan">移动画面</button>
+    </div>
+    <div class="brush-options"><span>笔宽</span><input type="range" id="brushSize" min="2" max="15" value="6"><span id="brushSizeVal">6 mm</span>
+      <button id="brushZoomOut">−</button><span id="brushZoomVal">1×</span><button id="brushZoomIn">＋</button></div>
+    <div id="brushWrap"><canvas id="brushCanvas"></canvas></div>
+    <div class="sheet-btns"><button class="b-plain" id="brushUndo">撤销一笔</button><button class="b-plain" id="brushCancel">取消</button><button class="b-primary" id="brushOk">完成修边</button></div>
+  </div>
+</div>
+
+<!-- ================= 弹层：三档对比 ================= -->
+<div class="sheet" id="cmpSheet">
+  <div class="sheet-card">
+    <h2>三档对比：格子边长与估算差异</h2>
+    <p class="hint">边长 1、2、3cm 的格子，每格面积分别是 1、4、9cm²。不满格按 0.5 格估算，结果可能偏大或偏小。</p>
+    <p class="hint" style="margin-top:-8px"><b>中间那条彩色条画的是「离轮廓参考面积差了多远」，条越短，数格结果与当前识别轮廓越接近。</b></p>
+    <div id="cmpBody"></div>
+    <div class="sheet-btns"><button class="b-plain" id="btnCmpClose">知道了</button></div>
+  </div>
+</div>
+
+<!-- ================= 弹层：帮助 ================= -->
+<div class="sheet" id="helpSheet">
+  <div class="sheet-card">
+    <h2>怎么用</h2>
+    <p class="hint">拍照 → 核对 A4 四角 → 先看手形 → 再数格</p>
+    <ol style="font-size:15px;color:var(--ink2);padding-left:22px;line-height:1.9">
+      <li>A4 白纸铺在深色桌面上，放一个手掌、树叶或纸片，正上方拍完整</li>
+      <li>点【拍一张】或【从相册选择】；四个点必须在真实纸角。没有自动纸框时，先亲手拖动四角；纸角没拍全就重拍</li>
+      <li>手形由模型自动识别并自动截腕；A4 纸角若找错，拖动四角到真实纸角后即可重算</li>
+      <li>边缘漏识别时，点【涂抹修边】局部补进或擦掉；整条轮廓认错时再用【逐点重描】</li>
+      <li>轮廓贴合后点【确认结果】，再切到【数格子】看满格／不满格，并用 1/2/3cm 比较</li>
+    </ol>
+    <p class="hint" style="margin-top:14px">认错了怎么办：点【调整纸边】拖动四个角；点【描轮廓】沿物体边缘依次点一圈。</p>
+    <p class="hint">手形自动轮廓若不完整，请重拍；背景容差仅用于其他物体。纸角被遮挡时需估计，面积误差可能较大。轮廓参考面积不是实物面积的独立真值。不支持透明、反光、带洞物体。</p>
+    <div class="sheet-btns"><button class="b-plain" id="btnHelpClose">知道了</button></div>
+  </div>
+</div>
+
+<div id="busy"><div class="spin"></div><div id="busyTxt">正在识别…</div></div>
+<div id="toast"></div>
+
+<!-- 识别失败时自动弹出，说明卡在哪一步。可复制后发给工具作者 -->
+<div id="diag">
+  <div class="dg-head">
+    <b>没读出来 · 卡在哪一步</b>
+    <button id="diagCopy">复制</button>
+    <button id="diagClose">关闭</button>
+  </div>
+  <pre class="dg-body" id="diagBody"></pre>
+</div>
+
+<script>
+/* =====================================================================
+   手掌面积估测器
+   纯前端单文件 · 零依赖 · 可离线 · 图像处理全部本地完成
+   ===================================================================== */
+
+/* ---------------- 常量区（要调参数就改这里） ---------------- */
+var CFG = {
+  A4_W: 21.0,            // A4 宽 (cm)
+  A4_H: 29.7,            // A4 高 (cm)
+  A4_RATIO: 1.414,       // A4 长宽比
+  A4_RATIO_TOL: 0.30,    // 认出的四边形长宽比偏离 1.414 超过这个值 → 判定认错纸。
+                         // 实测：正常竖放的纸偏 0.13；把桌面连进纸里的错认偏 0.37
+  PX_PER_CM: 40,         // 校正后每厘米多少像素
+  LOAD_MAX: 1800,        // 载入照片后最长边限制，控制性能
+  DET_W: 480,            // 纸边检测时的降采样宽度
+  SEG_SCALE: 2,          // 手掌分割的降采样倍数（在 A4 校正图上）
+  SEG_BLUR: 1,           // 分割前模糊半径。原来硬编码 2，把边缘和指尖一起糊掉了
+  CLOSE_CM: 0.2,         // 形态学闭运算半径 (cm)。原来是 0.4，会把张开的指缝填平，
+                         // 手就变成一坨看不出手指的团块。0.2 只补细缝、保住指缝
+  SIMPLIFY_EPS: 1.0,     // 轮廓简化容差（降采样域像素）。原来 1.5，点太稀，手形走样
+  PAPER_BAND: 0.07,      // 估计"纸的颜色"时取的边缘环带宽度（占短边比例）
+  PAPER_BRIGHT_FRAC: 0.5,// 估纸色时只取环带里"较亮的一半"再取中位数。
+                         // 取全体中位数会被褶皱阴影带偏——实测把白纸估成 rgb(163,159,156)
+  PAPER_NOISE_LOWPART: 0.6, // 算纸面色距噪声时只统计色距较小的 60%，丢掉阴影/桌面残影
+  SEG_MIN_FRAC: 0.05,    // 手掌连通块占校正图的合理下限。低于此值 → 自动换阈值重试
+  SEG_MAX_FRAC: 0.50,    // 合理上限。高于此值多半是"把整片阴影视成了手掌"
+  WRIST_AUTO: true,      // 自动截掉手腕/手臂
+  FULL_RATIO: 0.95,      // 覆盖率 ≥ 此值 → 满格
+  NEAR_RATIO: 0.90,      // 覆盖率 ≥ 此值 → 提示"临界格"
+  TOL_DEFAULT: 30,       // 背景容差滑块的显示默认值（0-60，映射成 ±30）
+  TOL_HALF: 30,
+  AREA_MIN: 40,          // 手掌面积合理下限 (cm²)
+  AREA_MAX: 250,         // 手掌面积合理上限 (cm²)
+  EDGE_WARN_CM: 1.2,     // 轮廓离纸边小于此值就警告
+  MIN_QUAD_AREA: 0.12,   // 纸四边形至少要占画面这么大
+  EDGE_CONTRAST_MIN: 8,  // 认出的"纸边"两侧平均明暗跳变的下限（0-255 尺度）。
+                         // 实测（2026-09-30）：真实照片 14.4 ~ 28.9；纯色渐变图 0.7。
+                         // 取 8 能在不误伤真实照片的前提下，拦掉"整张图没有边界却凑出一个
+                         // 长宽比刚好合格的四边刑"这种静默错误（纯色图曾被认成纸，比值 1.25）。
+                         // 这条闸装在灰度档和白纸程度档两处。
+                         // ⚠ 不能取 22：识别正确的真实照片(186)只有 14.4，会被误杀。
+  BORDER_TOUCH_PCT: 2.0, // 仅在诊断日志里报告"四角离画面边缘多近"。
+                         // ⚠ 只做信息记录，不做判据：实测识别完全正确的照片四角也会贴边(0px)，
+                         // 用"贴边"推"纸没拍全"会误判。
+  GRIDS: [1, 2, 3]
+};
+
+/* ---------------- DOM ---------------- */
+function $(id){ return document.getElementById(id); }
+var elHome=$('home'), elWork=$('work'), elCard=$('card');
+var view=$('view'), vctx=view.getContext('2d');
+var stage=$('stage'), cellInfo=$('cellInfo');
+
+/* ---------------- 小工具 ---------------- */
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+function dist(x1,y1,x2,y2){ var dx=x2-x1, dy=y2-y1; return Math.sqrt(dx*dx+dy*dy); }
+function fmt(v,d){ d=(d===undefined)?1:d; return (Math.round(v*Math.pow(10,d))/Math.pow(10,d)).toFixed(d); }
+
+/* ---------- 诊断：失败时说清"卡在哪一步" ----------
+   上一轮踩过的坑：失败提示只有一句笼统的"读不出来"，只能靠猜原因，
+   连着猜错三次。现在每一步的失败都要把「输入是什么 + 过到哪一步 + 为什么挂」
+   落进 DIAG.log，失败时弹抽屉，用户复制给作者即可定位。 */
+var DIAG = { log: [], stage: 'init' };
+function dlg(s){ DIAG.log.push(s); }
+function dstage(s){ DIAG.stage = s; }
+function dreset(){
+  DIAG.log = [];
+  DIAG.stage = '读取照片';
+  dlg('工具版本: ' + (window.__BUILD || '?'));
+  dlg('设备: ' + navigator.platform + ' / UA: ' + navigator.userAgent);
+  dlg('-- 分步记录 --');
+}
+function showDiag(){
+  var head = (DIAG.stage==='完成') ? '✓ 本次处理完成，下面是它的判断依据' : ('▸ 卡在: ' + DIAG.stage);
+  $('diagBody').textContent = head + '\n' + DIAG.log.join('\n');
+  $('diag').classList.add('on');
+  document.body.classList.add('dg-on');
+}
+function hideDiag(){
+  $('diag').classList.remove('on');
+  document.body.classList.remove('dg-on');
+}
+
+var toastTimer=null;
+function toast(msg,ms){
+  var t=$('toast'); t.textContent=msg; t.classList.add('on');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){ t.classList.remove('on'); }, ms||2600);
+}
+function busy(msg){
+  if(msg===false){ $('busy').classList.remove('on'); return; }
+  $('busyTxt').textContent=msg||'正在识别…';
+  $('busy').classList.add('on');
+}
+function nextTick(){ return new Promise(function(r){ setTimeout(r,16); }); }
+
+function showScreen(name){
+  elHome.classList.toggle('on', name==='home');
+  elWork.classList.toggle('on', name==='work');
+  elCard.classList.toggle('on', name==='card');
+}
+
+/* ---------------- 全局状态 ---------------- */
+var S = {
+  srcCanvas: null,     // 原始照片（已限幅）
+  kind: "hand",
+  confirmed: false, paperConfirmed: false, landscape: null, manualShape: false,
+  corners: null,       // 纸的四角，源图坐标 [{x,y}×4] 顺序 TL,TR,BR,BL
+  rectCanvas: null,    // 校正后的 A4 图（840×1188）
+  rectData: null,      // 上面的 ImageData
+  poly: null,          // 手掌轮廓多边形，rect 坐标（像素）—— 已截掉手腕/手臂
+  rawPoly: null,       // 截手腕之前的原始轮廓
+  wristAxis: null,     // 主轴/厚度剖面信息（滑块调手腕位置时用）
+  wristNorm: 100,      // 截掉手臂的比例：0 = 一点不切，100 = 切到指尖
+  wrist: null,         // 当前生效的手腕截断 {tCut, axis}
+  editCells: false,    // 是否允许点格子改判定（默认关，防学生误触）
+  polyTol: null,       // 生成该轮廓时用的容差值，用于判断是否需要重算
+  mask: null,          // Uint8Array 前景掩膜（rect 尺寸）
+  integral: null,      // mask 的积分图
+  gridCm: 1,
+  viewMode: 'shape',
+  tolan: 30,
+  filter: 'all',
+  showPhoto: true,
+  showCoord: true,
+  cells: null,         // 当前网格的每格覆盖率
+  stat: null,          // 当前统计
+  overrides: {},       // 手动改格 { "i,j": 0|1|2 }
+  undoStack: [],
+  zoom: 1, panX: 0, panY: 0,
+  viewScale: 1,        // rect 像素 → 屏幕像素
+  rectW: 0, rectH: 0
+};
+
+/* =====================================================================
+   模块 A · 基础图像算法
+   全部手写，不依赖任何库
+   ===================================================================== */
+
+function makeCanvas(w,h){ var c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
+function ctx2d(cv){ return cv.getContext('2d',{willReadFrequently:true}); }
+function canvasToData(cv){ return ctx2d(cv).getImageData(0,0,cv.width,cv.height); }
+
+function grayFrom(data){
+  var n=data.width*data.height, g=new Uint8Array(n), p=data.data;
+  for(var i=0,j=0;i<n;i++,j+=4) g[i]=(p[j]*77+p[j+1]*151+p[j+2]*28)>>8;
+  return g;
+}
+
+/* ---------------- 认纸专用：两个"更像白纸"的度量 ---------------- */
+
+/* "白纸程度"图：每像素取 RGB 三通道的最小值。
+   白纸三个通道都高 → min 就高；木桌/桌面偏暖，蓝通道低 → min 直接被压下去。
+   旧的灰度图按 0.3R+0.6G+0.1B 加权，暖色桌面和冷白纸能算出几乎一样的亮度，
+   于是浅木桌、米色台面这类背景会跟白纸连成一片。
+   实测（2026-09-30）：白纸 min≈220，浅木桌 min≈150，中间空出 70 的间距。
+   ⚠ 只在灰度图认纸失败时作为第二档使用，不影响已经能认出来的照片。 */
+function whiteFrom(data){
+  var n=data.width*data.height, g=new Uint8Array(n), p=data.data;
+  for(var i=0,j=0;i<n;i++,j+=4){
+    var r=p[j], gg=p[j+1], b=p[j+2];
+    var m=(r<gg)?r:gg; if(b<m) m=b;
+    g[i]=m;
+  }
+  return g;
+}
+
+/* 四边形四条边两侧的平均反差。
+   真纸的边界是一条"硬边"——一边是纸、一边是背景，跨过去亮度会跳一下。
+   如果认出来的四边形边界两侧几乎没差别，说明这条边是编的（落在桌面中间），
+   那就不是纸的边。这是防"把桌面当成纸"的最后一道闸。
+   返回 0-255 尺度的平均跳变量。 */
+function quadEdgeContrast(g,w,h,q,band){
+  var total=0, cnt=0, e, k, d;
+  for(e=0;e<4;e++){
+    var a=q[e], b=q[(e+1)%4];
+    var ex=b[0]-a[0], ey=b[1]-a[1];
+    var L=Math.sqrt(ex*ex+ey*ey); if(L<1) continue;
+    var nx=-ey/L, ny=ex/L;
+    for(k=1;k<=12;k++){
+      var t=k/13, px=a[0]+ex*t, py=a[1]+ey*t;
+      var si=0,ci=0,so=0,co=0;
+      for(d=1;d<=band;d++){
+        var xi=Math.round(px+nx*d), yi=Math.round(py+ny*d);
+        var xo=Math.round(px-nx*d), yo=Math.round(py-ny*d);
+        if(xi>=0&&xi<w&&yi>=0&&yi<h){ si+=g[yi*w+xi]; ci++; }
+        if(xo>=0&&xo<w&&yo>=0&&yo<h){ so+=g[yo*w+xo]; co++; }
+      }
+      if(ci&&co){ total+=Math.abs(si/ci-so/co); cnt++; }
+    }
+  }
+  return cnt?(total/cnt):0;
+}
+
+/* 四边形的角离画面边缘最近有多远（像素）。
+   贴近画面边缘 = 纸的这条边根本没拍进来。 */
+function quadBorderGap(q,w,h){
+  var min=1e9, i, j;
+  for(i=0;i<4;i++){
+    var d=[q[i][0], q[i][1], w-1-q[i][0], h-1-q[i][1]];
+    for(j=0;j<4;j++) if(d[j]<min) min=d[j];
+  }
+  return min;
+}
+
+/* Otsu 大津法：自动找二值化阈值 */
+function otsu(gray){
+  var hist=new Uint32Array(256), i;
+  for(i=0;i<gray.length;i++) hist[gray[i]]++;
+  var total=gray.length, sum=0;
+  for(i=0;i<256;i++) sum+=i*hist[i];
+  var sumB=0,wB=0,best=0,thr=0;
+  for(i=0;i<256;i++){
+    wB+=hist[i]; if(!wB) continue;
+    var wF=total-wB; if(!wF) break;
+    sumB+=i*hist[i];
+    var mB=sumB/wB, mF=(sum-sumB)/wF, d=mB-mF, v=wB*wF*d*d;
+    if(v>best){ best=v; thr=i; }
+  }
+  return thr;
+}
+
+/* 连通域标记（8 邻域，迭代式，不递归） */
+function labelComponents(mask,w,h){
+  var lab=new Int32Array(w*h); lab.fill(-1);
+  var stack=new Int32Array(w*h);
+  var sizes=[], comp=0, i;
+  for(i=0;i<w*h;i++){
+    if(!mask[i]||lab[i]>=0) continue;
+    var sp=0; stack[sp++]=i; lab[i]=comp;
+    var cnt=0,minX=w,maxX=-1,minY=h,maxY=-1;
+    while(sp>0){
+      var p=stack[--sp]; cnt++;
+      var x=p%w, y=(p-x)/w;
+      if(x<minX)minX=x; if(x>maxX)maxX=x;
+      if(y<minY)minY=y; if(y>maxY)maxY=y;
+      for(var dy=-1;dy<=1;dy++){
+        var ny=y+dy; if(ny<0||ny>=h) continue;
+        for(var dx=-1;dx<=1;dx++){
+          if(!dx&&!dy) continue;
+          var nx=x+dx; if(nx<0||nx>=w) continue;
+          var q=ny*w+nx;
+          if(mask[q]&&lab[q]<0){ lab[q]=comp; stack[sp++]=q; }
+        }
+      }
+    }
+    sizes.push({n:cnt,minX:minX,maxX:maxX,minY:minY,maxY:maxY});
+    comp++;
+  }
+  return {lab:lab,sizes:sizes,count:comp};
+}
+
+/* 凸包（Andrew monotone chain） */
+function convexHull(pts){
+  if(pts.length<3) return pts.slice();
+  var p=pts.slice().sort(function(a,b){ return a[0]-b[0]||a[1]-b[1]; });
+  function cross(o,a,b){ return (a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]); }
+  var lo=[],up=[],i;
+  for(i=0;i<p.length;i++){
+    while(lo.length>=2 && cross(lo[lo.length-2],lo[lo.length-1],p[i])<=0) lo.pop();
+    lo.push(p[i]);
+  }
+  for(i=p.length-1;i>=0;i--){
+    while(up.length>=2 && cross(up[up.length-2],up[up.length-1],p[i])<=0) up.pop();
+    up.push(p[i]);
+  }
+  lo.pop(); up.pop();
+  return lo.concat(up);
+}
+
+/* Douglas-Peucker 折线简化 */
+function simplifyDP(pts,eps){
+  var n=pts.length;
+  if(n<3) return pts.slice();
+  var keep=new Uint8Array(n); keep[0]=1; keep[n-1]=1;
+  var stack=[[0,n-1]];
+  while(stack.length){
+    var seg=stack.pop(), a=seg[0], b=seg[1];
+    if(b<=a+1) continue;
+    var ax=pts[a][0],ay=pts[a][1],bx=pts[b][0],by=pts[b][1];
+    var dx=bx-ax, dy=by-ay, len2=dx*dx+dy*dy, best=-1, bi=-1, i;
+    for(i=a+1;i<b;i++){
+      var d;
+      if(len2<1e-9) d=dist(ax,ay,pts[i][0],pts[i][1]);
+      else{
+        var t=clamp(((pts[i][0]-ax)*dx+(pts[i][1]-ay)*dy)/len2,0,1);
+        d=dist(ax+t*dx,ay+t*dy,pts[i][0],pts[i][1]);
+      }
+      if(d>best){ best=d; bi=i; }
+    }
+    if(best>eps){ keep[bi]=1; stack.push([a,bi]); stack.push([bi,b]); }
+  }
+  var out=[];
+  for(i=0;i<n;i++) if(keep[i]) out.push(pts[i]);
+  return out;
+}
+
+/* 闭合多边形简化：从离起点最远的点切开，分两段简化 */
+function simplifyClosed(pts,eps){
+  if(pts.length<5) return pts.slice();
+  var far=0,best=-1,i;
+  for(i=1;i<pts.length;i++){
+    var d=dist(pts[0][0],pts[0][1],pts[i][0],pts[i][1]);
+    if(d>best){ best=d; far=i; }
+  }
+  var a=pts.slice(0,far+1), b=pts.slice(far).concat([pts[0]]);
+  var r1=simplifyDP(a,eps), r2=simplifyDP(b,eps);
+  return r1.concat(r2.slice(1,-1));
+}
+
+/* Moore 邻域边界追踪（要求 mask 四周留有一圈背景）
+   停止条件用两条保险：
+   1) 回到起点像素（起点取最上最左的前景像素，正常只可能回到一次）
+   2) (像素,回溯方向) 状态重复——这是确定性游走，状态必然重复，绝对不会绕多圈
+*/
+function traceOutline(mask,w,h){
+  var N8=[[-1,0],[-1,-1],[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1]];
+  var sx=-1,sy=-1,x,y,i;
+  for(y=0;y<h&&sx<0;y++) for(x=0;x<w;x++) if(mask[y*w+x]){ sx=x; sy=y; break; }
+  if(sx<0) return [];
+  var seen=new Uint8Array(w*h*8);
+  var pts=[], cx=sx, cy=sy, bp=0, guard=0, guardMax=(w+h)*8+5000;
+  while(guard++<guardMax){
+    var st=(cy*w+cx)*8+bp;
+    if(seen[st]) break;
+    seen[st]=1;
+    pts.push([cx,cy]);
+    var moved=false;
+    for(i=1;i<=8;i++){
+      var d=(bp+i)&7;
+      var nx=cx+N8[d][0], ny=cy+N8[d][1];
+      if(nx<0||ny<0||nx>=w||ny>=h) continue;
+      if(mask[ny*w+nx]){ cx=nx; cy=ny; bp=(d+4)&7; moved=true; break; }
+    }
+    if(!moved) break;
+    if(cx===sx&&cy===sy&&pts.length>4) break;
+  }
+  return pts;
+}
+
+/* 形态学：一维滑动窗口取极值 */
+function morphPass(src,w,h,r,isMax,horiz){
+  var out=new Uint8Array(w*h);
+  var n=horiz?w:h, outer=horiz?h:w;
+  for(var o=0;o<outer;o++){
+    var base=horiz?o*w:o, step=horiz?1:w;
+    for(var i=0;i<n;i++){
+      var lo=Math.max(0,i-r), hi=Math.min(n-1,i+r), acc=isMax?0:1;
+      for(var j=lo;j<=hi;j++){
+        var t=src[base+j*step]?1:0;
+        if(isMax){ if(t){ acc=1; break; } }
+        else{ if(!t){ acc=0; break; } }
+      }
+      out[base+i*step]=acc;
+    }
+  }
+  return out;
+}
+/* 闭运算：先膨胀后腐蚀，填掉窄缝 */
+function morphClose(mask,w,h,r){
+  if(r<1) return mask.slice();
+  var a=morphPass(mask,w,h,r,true,true);
+  var b=morphPass(a,w,h,r,true,false);
+  var c=morphPass(b,w,h,r,false,true);
+  return morphPass(c,w,h,r,false,false);
+}
+
+/* 线性方程组：列主元高斯消元 */
+function solveLin(A,b,n){
+  var i,r,c;
+  for(i=0;i<n;i++){
+    var piv=i;
+    for(r=i+1;r<n;r++) if(Math.abs(A[r][i])>Math.abs(A[piv][i])) piv=r;
+    if(Math.abs(A[piv][i])<1e-12) return null;
+    if(piv!==i){
+      var t=A[i]; A[i]=A[piv]; A[piv]=t;
+      var tb=b[i]; b[i]=b[piv]; b[piv]=tb;
+    }
+    for(r=i+1;r<n;r++){
+      var f=A[r][i]/A[i][i];
+      if(!f) continue;
+      for(c=i;c<n;c++) A[r][c]-=f*A[i][c];
+      b[r]-=f*b[i];
+    }
+  }
+  var x=new Array(n);
+  for(i=n-1;i>=0;i--){
+    var s=b[i];
+    for(c=i+1;c<n;c++) s-=A[i][c]*x[c];
+    x[i]=s/A[i][i];
+  }
+  return x;
+}
+
+/* 单应矩阵：把 dst 坐标映射到 src 坐标（dst 是校正后的正矩形） */
+function homography(dstPts,srcPts){
+  var A=[],b=[],i;
+  for(i=0;i<4;i++){
+    var u=dstPts[i][0], v=dstPts[i][1], x=srcPts[i][0], y=srcPts[i][1];
+    A.push([u,v,1,0,0,0,-x*u,-x*v]); b.push(x);
+    A.push([0,0,0,u,v,1,-y*u,-y*v]); b.push(y);
+  }
+  var h=solveLin(A,b,8);
+  if(!h) return null;
+  return [h[0],h[1],h[2],h[3],h[4],h[5],h[6],h[7],1];
+}
+
+/* 透视校正：把照片里的纸拉成正的 A4 比例
+   角序约定：[左上, 右上, 右下, 左下]。
+   纸可能是横着放的（老师为了放手方便会这么干），这时候长边在水平方向，
+   目标画布必须换成 29.7×21，否则整张图会被各向异性缩放，面积就不对了。 */
+function rectify(srcCanvas,corners){
+  var eTop=Math.hypot(corners[1].x-corners[0].x, corners[1].y-corners[0].y);
+  var eRight=Math.hypot(corners[2].x-corners[1].x, corners[2].y-corners[1].y);
+  if(!validPaperQuad(corners,srcCanvas.width,srcCanvas.height)) return null;
+  var landscape = S.landscape===null ? eTop > eRight : S.landscape;
+  var W=Math.round((landscape?CFG.A4_H:CFG.A4_W)*CFG.PX_PER_CM);
+  var H=Math.round((landscape?CFG.A4_W:CFG.A4_H)*CFG.PX_PER_CM);
+  if(typeof dlg==='function'){
+    dlg('透视校正: 目标画布 '+W+'×'+H+' px'+(landscape?'（纸横放）':'（纸竖放）'));
+  }
+  var sd=canvasToData(srcCanvas), sw=srcCanvas.width, sh=srcCanvas.height, sp=sd.data;
+  var dst=[[0,0],[W,0],[W,H],[0,H]];
+  var src=[[corners[0].x,corners[0].y],[corners[1].x,corners[1].y],
+           [corners[2].x,corners[2].y],[corners[3].x,corners[3].y]];
+  var M=homography(dst,src);
+  if(!M) return null;
+  var out=ctx2d(makeCanvas(1,1)).createImageData(W,H);
+  var op=out.data;
+  var h0=M[0],h1=M[1],h2=M[2],h3=M[3],h4=M[4],h5=M[5],h6=M[6],h7=M[7];
+  for(var y=0;y<H;y++){
+    for(var x=0;x<W;x++){
+      var den=h6*x+h7*y+1;
+      var sx=(h0*x+h1*y+h2)/den;
+      var sy=(h3*x+h4*y+h5)/den;
+      var o=(y*W+x)*4;
+      if(sx<0||sy<0||sx>sw-1.001||sy>sh-1.001){
+        op[o]=250;op[o+1]=249;op[o+2]=246;op[o+3]=255; continue;
+      }
+      var x0=sx|0, y0=sy|0;
+      var x1=x0+1<sw?x0+1:sw-1, y1=y0+1<sh?y0+1:sh-1;
+      var fx=sx-x0, fy=sy-y0;
+      var i00=(y0*sw+x0)<<2, i10=(y0*sw+x1)<<2, i01=(y1*sw+x0)<<2, i11=(y1*sw+x1)<<2;
+      var w00=(1-fx)*(1-fy), w10=fx*(1-fy), w01=(1-fx)*fy, w11=fx*fy;
+      op[o]  =sp[i00]*w00+sp[i10]*w10+sp[i01]*w01+sp[i11]*w11;
+      op[o+1]=sp[i00+1]*w00+sp[i10+1]*w10+sp[i01+1]*w01+sp[i11+1]*w11;
+      op[o+2]=sp[i00+2]*w00+sp[i10+2]*w10+sp[i01+2]*w01+sp[i11+2]*w11;
+      op[o+3]=255;
+    }
+  }
+  var cv=makeCanvas(W,H);
+  ctx2d(cv).putImageData(out,0,0);
+  return cv;
+}
+
+/* 多边形栅格化成 0/1 掩膜 */
+function rasterizePoly(poly,w,h){
+  var cv=makeCanvas(w,h), c=ctx2d(cv);
+  c.fillStyle='#000';
+  if(poly&&poly.length>=3){
+    c.beginPath(); c.moveTo(poly[0][0],poly[0][1]);
+    for(var i=1;i<poly.length;i++) c.lineTo(poly[i][0],poly[i][1]);
+    c.closePath(); c.fill();
+  }
+  var d=c.getImageData(0,0,w,h).data, m=new Uint8Array(w*h);
+  for(var i2=0,j=3;i2<m.length;i2++,j+=4) m[i2]=d[j]>127?1:0;
+  return m;
+}
+
+/* 掩膜积分图：O(1) 求任意矩形内的前景像素数 */
+function integralOf(mask,w,h){
+  var I=new Uint32Array((w+1)*(h+1)), x,y;
+  for(y=0;y<h;y++){
+    var row=0, base=(y+1)*(w+1), prev=y*(w+1);
+    for(x=0;x<w;x++){
+      row+=mask[y*w+x];
+      I[base+x+1]=I[prev+x+1]+row;
+    }
+  }
+  return I;
+}
+function rectSum(I,w,x0,y0,x1,y1){
+  return I[y1*(w+1)+x1]-I[y0*(w+1)+x1]-I[y1*(w+1)+x0]+I[y0*(w+1)+x0];
+}
+
+/* 从凸包上取 A4 四个角：用 x+y / x-y 的极值 */
+function quadFromHull(hull,minDist){
+  var n=hull.length, i;
+  if(n<4) return null;
+  var tl=null,tr=null,br=null,bl=null;
+  var sMin=Infinity,sMax=-Infinity,dMin=Infinity,dMax=-Infinity;
+  for(i=0;i<n;i++){
+    var s=hull[i][0]+hull[i][1], d=hull[i][0]-hull[i][1];
+    if(s<sMin){ sMin=s; tl=hull[i]; }
+    if(s>sMax){ sMax=s; br=hull[i]; }
+    if(d>dMax){ dMax=d; tr=hull[i]; }
+    if(d<dMin){ dMin=d; bl=hull[i]; }
+  }
+  if(!tl||!tr||!br||!bl) return null;
+  var q=[tl,tr,br,bl];
+  for(i=0;i<4;i++) for(var j=i+1;j<4;j++){
+    if(dist(q[i][0],q[i][1],q[j][0],q[j][1])<minDist) return null;
+  }
+  return q;
+}
+
+/* 四边形面积（鞋带公式） */
+function polyArea(p){
+  var a=0;
+  for(var i=0,n=p.length;i<n;i++){
+    var j=(i+1)%n;
+    a+=p[i][0]*p[j][1]-p[j][0]*p[i][1];
+  }
+  return Math.abs(a)/2;
+}
+/* 判断四边形是否凸 */
+function isConvexQuad(q){
+  var sign=0;
+  for(var i=0;i<4;i++){
+    var a=q[i], b=q[(i+1)%4], c=q[(i+2)%4];
+    var cr=(b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0]);
+    if(Math.abs(cr)<1e-6) continue;
+    var s=cr>0?1:-1;
+    if(sign===0) sign=s;
+    else if(s!==sign) return false;
+  }
+  return true;
+}
+
+/* =====================================================================
+   模块 B · 识别流水线
+   拍照 → 认纸 → 透视校正 → 切手掌 → 上网格 → 统计
+   ===================================================================== */
+
+/* 均值模糊（可分离两遍，够快） */
+function boxBlur(g,w,h,r){
+  if(r<1) return g;
+  var t=new Uint8Array(w*h), o=new Uint8Array(w*h);
+  var x,y,i;
+  for(y=0;y<h;y++){
+    var base=y*w;
+    for(x=0;x<w;x++){
+      var lo=Math.max(0,x-r), hi=Math.min(w-1,x+r), s=0, c=0;
+      for(i=lo;i<=hi;i++){ s+=g[base+i]; c++; }
+      t[base+x]=s/c;
+    }
+  }
+  for(x=0;x<w;x++){
+    for(y=0;y<h;y++){
+      var lo2=Math.max(0,y-r), hi2=Math.min(h-1,y+r), s2=0, c2=0;
+      for(i=lo2;i<=hi2;i++){ s2+=t[i*w+x]; c2++; }
+      o[y*w+x]=s2/c2;
+    }
+  }
+  return o;
+}
+
+/* 清掉贴着纸边的像素，避免校正残留的黑边被当成手掌 */
+function clearBorder(mask,w,h,px){
+  var m=mask.slice();
+  for(var y=0;y<h;y++){
+    for(var x=0;x<w;x++){
+      if(x<px||y<px||x>=w-px||y>=h-px) m[y*w+x]=0;
+    }
+  }
+  return m;
+}
+
+/* ---- 认白纸：找照片里最大的亮块，取它的四个角 ---- */
+/* 纸边检测失败时要能说清为什么，不同原因对应完全不同的拍法建议 */
+var PAPER_FAIL='', SEG_FAIL='';
+/* 认纸失败原因的分级：0 最具体（能直接指导学生重拍）、1 次之、2 最泛。
+   两档都失败时取"更具体"的那条报给用户，而不是随便扔一句"形状不像 A4"。 */
+var PAPER_PRI=2;
+/* 最近一档认纸量到的两个物理量，用于给失败原因定性 */
+var LAST_EDGE_CONTRAST=0, LAST_BORDER_GAP=1e9;
+function detectPaper(cv,bias,useWhite){
+  PAPER_FAIL=''; PAPER_PRI=2;
+  bias=bias||0;
+  var scale=Math.min(1,CFG.DET_W/cv.width);
+  var dw=Math.max(80,Math.round(cv.width*scale));
+  var dh=Math.max(80,Math.round(cv.height*scale));
+  var small=makeCanvas(dw,dh);
+  ctx2d(small).drawImage(cv,0,0,dw,dh);
+  var imd=ctx2d(small).getImageData(0,0,dw,dh);
+  var g=(useWhite?whiteFrom:grayFrom)(imd);
+  g=boxBlur(g,dw,dh,1);
+  var t0=otsu(g);
+  /* bias：把 Otsu 阈值再抬高一截，用来对付"浅色桌面和白纸亮度接近"。
+     桌面偏暗时，抬高阈值能把纸单独留下。 */
+  var t=t0+bias*(255-t0);
+  var mask=new Uint8Array(dw*dh), i;
+  for(i=0;i<g.length;i++) mask[i]=g[i]>t?1:0;
+  var lit=0; for(i=0;i<mask.length;i++) lit+=mask[i];
+  var litPct=Math.round(lit/mask.length*100);
+  dlg('纸边检测'+(useWhite?'[白纸程度图]':'[灰度图]')+'[偏置'+bias.toFixed(2)+']: 降采样 '+dw+'×'+dh+
+      '（原图已限幅为 '+cv.width+'×'+cv.height+'，下面四角坐标用的是这个参照系）'+
+      '，阈值 '+Math.round(t)+'（Otsu '+Math.round(t0)+'），"亮面"占 '+litPct+'%');
+  var r=labelComponents(mask,dw,dh);
+  if(!r.count){ PAPER_FAIL='整张图找不到一块亮面（全暗）——可能拍糊了或者根本没拍进纸'; PAPER_PRI=0; return null; }
+  var bi=-1,bn=-1,k;
+  for(k=0;k<r.count;k++) if(r.sizes[k].n>bn){ bn=r.sizes[k].n; bi=k; }
+  if(bi<0){ PAPER_FAIL='找不到连通的亮面'; PAPER_PRI=1; return null; }
+  var pct=Math.round(bn/(dw*dh)*100);
+  dlg('  最大亮面: 占画面 '+pct+'%（要求 ≥ '+Math.round(CFG.MIN_QUAD_AREA*100)+'%）');
+  if(bn<dw*dh*CFG.MIN_QUAD_AREA){
+    if(litPct>60){ PAPER_FAIL='画面里亮的地方太多（占 '+litPct+'%），白纸和背景糊在一起分不开——背景太亮或太白了'; PAPER_PRI=0; }
+    else { PAPER_FAIL='最大的亮面只占画面 '+pct+'%，太小——纸放得太远、或者被手掌/手臂挡住了大半'; PAPER_PRI=1; }
+    return null;
+  }
+  var s=r.sizes[bi], pts=[], x, y;
+  for(y=s.minY;y<=s.maxY;y++)
+    for(x=s.minX;x<=s.maxX;x++)
+      if(r.lab[y*dw+x]===bi) pts.push([x,y]);
+  if(pts.length<30){ PAPER_FAIL='亮面像素太少，边缘噪声太大'; return null; }
+  var hull=convexHull(pts);
+  var q=quadFromHull(hull,Math.min(dw,dh)*0.12);
+  if(!q){ PAPER_FAIL='这个亮面凑不出四边形——白纸可能被手掌/手臂压过，形状缺了一块'; return null; }
+  var a=polyArea(q);
+  if(a<dw*dh*CFG.MIN_QUAD_AREA){
+    PAPER_FAIL='围出的四边形太小（占画面 '+Math.round(a/(dw*dh)*100)+'%）——纸放得太远，镜头里留白太多';
+    return null;
+  }
+  if(a>dw*dh*0.97){
+    PAPER_FAIL='围出的四边形几乎占满整屏（'+Math.round(a/(dw*dh)*100)+'%）——镜头离纸太近，纸的四条边没拍全';
+    return null;
+  }
+  if(!isConvexQuad(q)){ PAPER_FAIL='围出的四边形是凹的（不是正经矩形）——多半是手或阴影把纸边啃掉了一块'; return null; }
+  var inv=1/scale;
+  var qq=q.map(function(p){ return {x:p[0]*inv,y:p[1]*inv}; });
+  var e0=Math.hypot(qq[1].x-qq[0].x, qq[1].y-qq[0].y);   /* 角0→角1 */
+  var e1=Math.hypot(qq[2].x-qq[1].x, qq[2].y-qq[1].y);   /* 角1→角2 */
+  var ratio=Math.max(e0,e1)/Math.max(1,Math.min(e0,e1));
+  dlg('  四边形: 占画面 '+Math.round(a/(dw*dh)*100)+'%，长宽比 '+ratio.toFixed(2)+
+      '（A4 应为 1.41）'+(e0>e1?'，长边水平=纸横放':'，长边垂直=纸竖放'));
+  dlg('  四角坐标: '+qq.map(function(p){return '('+Math.round(p.x)+','+Math.round(p.y)+')';}).join(' '));
+  var gap=quadBorderGap(q,dw,dh);
+  var gapPct=gap/Math.min(dw,dh)*100;
+  var con=quadEdgeContrast(g,dw,dh,q,3);
+  LAST_EDGE_CONTRAST=con; LAST_BORDER_GAP=gap;
+  dlg('  四边边界反差 '+con.toFixed(1)+'（这道闸的下限是 '+CFG.EDGE_CONTRAST_MIN+
+      '；实测真实照片 14~29，纯色图 0.7）');
+  dlg('  四角离画面边缘最近 '+Math.round(gap)+'px（短边的 '+gapPct.toFixed(1)+
+      '%）——仅供参考，识别正确的照片也可能贴边');
+  var score=Math.abs(ratio-CFG.A4_RATIO);
+  if(score>CFG.A4_RATIO_TOL){
+    if(con<CFG.EDGE_CONTRAST_MIN){
+      PAPER_FAIL='认出来的"纸"四条边几乎没有明暗反差（'+con.toFixed(1)+'）——它根本不是纸，是把一片浅色背景圈起来了。把纸放到深色桌面/深色垫板上再拍';
+      PAPER_PRI=0;
+    }else{
+      PAPER_FAIL='围出来的形状不像 A4（长宽比 '+ratio.toFixed(2)+'，应该接近 1.41）——多半是把桌面或阴影当成纸了。把纸边上的杂物移开、纸抹平，或者手动点四个角';
+      PAPER_PRI=2;
+    }
+    dlg('  ✗ 长宽比偏差 '+score.toFixed(2)+' > 允许 '+CFG.A4_RATIO_TOL+'，这一档不采用');
+    return null;
+  }
+  /* 形状凑合，但边界是平的 → 这不是纸边，是"整张图没边界却被凑出一个四边刑"。
+     实测例子：800×1000 纯色渐变图被认成纸，长宽比 1.25 恰好落在容差内，
+     靠这条闸拦下。没有它就会静默出一串错数字。
+     阈值取 8：真实照片最低 14.4（186），留了近一倍余量。 */
+  if(con<CFG.EDGE_CONTRAST_MIN){
+    PAPER_FAIL='认出来的四边形四条边几乎是平的（反差只有 '+con.toFixed(1)+
+      '），没有"纸边"该有的明暗跳变——不敢拿它算面积。白纸要和背景有明显分界（换深色桌面/垫板），或者手动点四个角';
+    PAPER_PRI=0;
+    dlg('  ✗ 边界反差 '+con.toFixed(1)+' < '+CFG.EDGE_CONTRAST_MIN+'，判定认错，不采用');
+    return null;
+  }
+  dlg('  ✓ 长宽比偏差 '+score.toFixed(2)+' 在允许范围内');
+  return qq;
+}
+
+/* 认纸。两档，都是同一套判据（长宽比 + 边界反差 + 面积），换的是"看什么图"：
+   第 1 档 灰度图  —— 已验证的行为，浅木桌那批照片靠它做到 1.7% 精度，不动它。
+   第 2 档 白纸程度图（min(R,G,B)）—— 只在第 1 档失败时才启用。
+     教室里的麻烦主要是"浅色台面/木桌和白纸亮度接近"，灰度加权算不出差别，min 通道能。
+   ⚠ 别在这里做"多档阈值抢救"。试过：加几档偏置挑"长宽比最接近 1.41"的那个，
+   结果偏置 -0.10 那档框进了桌面，长宽比恰好凑成 1.41 被选中，
+   面积从 171.5 变成 120.0 —— 形状对不代表框对了，这种巧合会静默给出错数字。
+   第 2 档能加，是因为它多带了一道"边界必须有明暗反差"的硬闸；
+   而且第 2 档的结论一旦通过，形状和反差两个条件同时成立，巧合凑不齐这两样。
+   宁可报"没认出白纸"让老师点四个角，也不要给一个看起来正常的错结果。 */
+function detectPaperBest(cv){
+  var fails=[];
+  var r=detectPaper(cv,0,false);
+  if(r) return r;
+  fails.push({msg:PAPER_FAIL,pri:PAPER_PRI});
+
+  dlg('— 灰度图没认出纸，换「白纸程度图」再试一档 —');
+  var r2=detectPaper(cv,0,true);
+  if(r2){
+    dlg('✓ 采用「白纸程度图」认出的纸（浅色/暖色台面被压暗，白纸单独留了下来）');
+    return r2;
+  }
+  fails.push({msg:PAPER_FAIL,pri:PAPER_PRI});
+
+  /* 报"更具体"的那条：能直接指导学生重拍的（贴边 / 背景太亮 / 无反差）优先于
+     笼统的"形状不像 A4"。 */
+  fails.sort(function(a,b){ return a.pri-b.pri; });
+  PAPER_FAIL=fails.length?fails[0].msg:'两档都没认出像 A4 的白纸';
+  dlg('两档都失败，向上报最具体的那条原因');
+  return null;
+}
+
+var MAX_COLOR_DIST = 441.7;   /* sqrt(255^2 * 3) */
+
+/* 纸色估计：取校正图四条边内侧一圈像素。
+   ⚠ 不能取全体中位数。教室实拍的照片里白纸满是褶皱，一圈像素的亮度能差一倍，
+   中位数会把"阴影色"当成纸色——实测一张真实照片估出 rgb(163,159,156)，
+   而真纸是 220+，于是色距全错、阈值被顶到 157，手掌一个像素都切不出来。
+   纸的"本色"应该看亮的那一侧：只取较亮的一半，再取中位数。 */
+function estimatePaperColor(img){
+  var w=img.width, h=img.height, d=img.data;
+  var band=Math.max(3,Math.round(Math.min(w,h)*CFG.PAPER_BAND));
+  var px=[],x,y,j;
+  function take(x2,y2){
+    j=(y2*w+x2)*4;
+    var r=d[j], g=d[j+1], b=d[j+2];
+    px.push([0.299*r+0.587*g+0.114*b, r, g, b]);
+  }
+  for(y=0;y<h;y+=2){ for(x=0;x<band;x+=2){ take(x,y); take(w-1-x,y); } }
+  for(x=0;x<w;x+=2){ for(y=0;y<band;y+=2){ take(x,y); take(x,h-1-y); } }
+  if(!px.length) return [240,240,238];
+  px.sort(function(p,q){ return p[0]-q[0]; });
+  var lo=Math.floor(px.length*(1-CFG.PAPER_BRIGHT_FRAC));
+  var seg=px.slice(lo);
+  function med(k){
+    var a=[];
+    for(var i=0;i<seg.length;i++) a.push(seg[i][k]);
+    a.sort(function(p,q){ return p-q; });
+    return a[a.length>>1];
+  }
+  return [med(1),med(2),med(3)];
+}
+
+/* 色距图：每个像素离纸色多远，量化到 0-255。
+   这是本次修"手不像手"的核心——旧版只比亮度，肤色和纸的差别
+   主要在颜色而不在明暗，所以受光均匀的指尖会被整片丢掉。 */
+function colorDistMap(img,paper){
+  var n=img.width*img.height, p=img.data, out=new Uint8Array(n);
+  var pr=paper[0],pg=paper[1],pb=paper[2],k=255/MAX_COLOR_DIST,i,j;
+  for(i=0,j=0;i<n;i++,j+=4){
+    var dr=p[j]-pr, dg=p[j+1]-pg, db=p[j+2]-pb;
+    var v=Math.sqrt(dr*dr+dg*dg+db*db)*k;
+    out[i]=v>255?255:(v|0);
+  }
+  return out;
+}
+
+/* 纸面自身的色距噪声（95 分位）。用它给阈值兜底，
+   保证"白纸轻微不匀/纸纹"不会被当成手掌。
+   ⚠ 只统计色距较小的那一段（丢掉最大的 40%）：褶皱阴影、纸边桌面残影的色距很大，
+   把它们算进来会把"纸面噪声"顶到 87，×1.8 之后阈值直接变成 157，手掌全部消失。
+   纸面自身的不匀只体现在低分段。 */
+function paperNoise95(u8,w,h){
+  var band=Math.max(3,Math.round(Math.min(w,h)*CFG.PAPER_BAND));
+  var a=[],x,y;
+  for(y=0;y<h;y+=2){ for(x=0;x<band;x+=2){ a.push(u8[y*w+x]); a.push(u8[y*w+w-1-x]); } }
+  for(x=0;x<w;x+=2){ for(y=0;y<band;y+=2){ a.push(u8[y*w+x]); a.push(u8[(h-1-y)*w+x]); } }
+  if(!a.length) return 8;
+  a.sort(function(p,q){return p-q;});
+  var n=Math.max(1,Math.floor(a.length*CFG.PAPER_NOISE_LOWPART));
+  return a[Math.min(n-1,Math.floor(n*0.95))];
+}
+
+/* 半平面裁剪（Sutherland-Hodgman）：保留 nx*x + ny*y <= d 的一侧 */
+function clipHalfPlane(poly,nx,ny,d){
+  var out=[], n=poly.length, i;
+  for(i=0;i<n;i++){
+    var a=poly[i], b=poly[(i+1)%n];
+    var da=nx*a[0]+ny*a[1]-d, db=nx*b[0]+ny*b[1]-d;
+    if(da<=0) out.push(a);
+    if((da<0&&db>0)||(da>0&&db<0)){
+      var t=da/(da-db);
+      out.push([a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]);
+    }
+  }
+  return out;
+}
+
+/* ============================================================
+   手腕截断：拍照必然连着手臂，得把手腕/前臂切掉
+
+   思路：手掌轮廓沿"主轴"方向的厚度剖面是有特征的 ——
+     指尖端：多个小尖（五指），起伏剧烈
+     掌  部：最厚，8~10cm
+     手腕处：明显收窄（约为掌宽的 0.5~0.7）
+     手臂端：又变粗，并且一直延伸到纸边
+   所以：认定手臂端 → 从那一端往掌心扫 → 第一个显著收窄处就是手腕。
+
+   u 是"沿手臂方向的归一化位置"：u=1 在最靠近手臂的那端，u=0 在指尖端。
+   ============================================================ */
+function wristAxis(poly,W,H,pxPerCm){
+  var n=poly.length,i,j;
+  if(n<24) return null;
+  var cx=0,cy=0;
+  for(i=0;i<n;i++){ cx+=poly[i][0]; cy+=poly[i][1]; }
+  cx/=n; cy/=n;
+  var sxx=0,sxy=0,syy=0;
+  for(i=0;i<n;i++){
+    var dx=poly[i][0]-cx, dy=poly[i][1]-cy;
+    sxx+=dx*dx; sxy+=dx*dy; syy+=dy*dy;
+  }
+  sxx/=n; sxy/=n; syy/=n;
+  var tr=sxx+syy, det=sxx*syy-sxy*sxy;
+  var l1=tr/2+Math.sqrt(Math.max(0,tr*tr/4-det));
+  var ax,ay;
+  if(Math.abs(sxy)>1e-6){ ax=l1-syy; ay=sxy; }
+  else { ax=(sxx>=syy)?1:0; ay=(sxx>=syy)?0:1; }
+  var al=Math.sqrt(ax*ax+ay*ay);
+  if(al<1e-9) return null;
+  ax/=al; ay/=al;
+  var vx=-ay, vy=ax;
+
+  var BINS=56, tmin=1e9, tmax=-1e9;
+  var ts=new Float32Array(n), us=new Float32Array(n);
+  for(i=0;i<n;i++){
+    var ex=poly[i][0]-cx, ey=poly[i][1]-cy;
+    ts[i]=ex*ax+ey*ay;  us[i]=ex*vx+ey*vy;
+    if(ts[i]<tmin)tmin=ts[i];
+    if(ts[i]>tmax)tmax=ts[i];
+  }
+  var span=tmax-tmin;
+  if(span<pxPerCm*3) return null;
+  var lo=new Float32Array(BINS),hi=new Float32Array(BINS),cnt=new Int32Array(BINS);
+  for(i=0;i<BINS;i++){ lo[i]=1e9; hi[i]=-1e9; }
+  for(i=0;i<n;i++){
+    var idx=Math.floor((ts[i]-tmin)/span*(BINS-1));
+    if(idx<0)idx=0; if(idx>=BINS)idx=BINS-1;
+    if(us[i]<lo[idx])lo[idx]=us[i];
+    if(us[i]>hi[idx])hi[idx]=us[i];
+    cnt[idx]++;
+  }
+  var wid=new Float32Array(BINS);
+  for(i=0;i<BINS;i++) wid[i]=cnt[i]?(hi[i]-lo[i]):0;
+  for(i=0;i<BINS;i++) if(!cnt[i]) wid[i]=i>0?wid[i-1]:0;
+  var maxW=0,iMax=0;
+  for(i=0;i<BINS;i++) if(wid[i]>maxW){ maxW=wid[i]; iMax=i; }
+  if(maxW<pxPerCm*2.5) return null;
+
+  /* 手臂端判定：看"有没有一条贴着纸边的长直边"。
+     手臂一定从纸外伸进来，轮廓在纸边处会被截成一条直线，这条直线就是铁证。
+     ⚠ 不能数"贴边点的个数"——轮廓简化会把这条直线压成 2 个端点，
+     用点数判会漏掉（实测：整条手臂只剩 2 个贴边点）。 */
+  var edgePx=pxPerCm*1.0, minEdgeLen=pxPerCm*2.5;
+  var segT=[];
+  for(i=0;i<n;i++){
+    var pa=poly[i], pb=poly[(i+1)%n];
+    if(dist(pa[0],pa[1],pb[0],pb[1])<minEdgeLen) continue;
+    var aE=(pa[0]<edgePx||pa[1]<edgePx||pa[0]>W-edgePx||pa[1]>H-edgePx);
+    var bE=(pb[0]<edgePx||pb[1]<edgePx||pb[0]>W-edgePx||pb[1]>H-edgePx);
+    if(aE&&bE) segT.push((ts[i]+ts[(i+1)%n])/2);
+  }
+  var hasArmEdge=segT.length>0;
+  var armEnd;
+  if(hasArmEdge){
+    var em=0;
+    for(j=0;j<segT.length;j++) em+=segT[j];
+    em/=segT.length;
+    armEnd=(em>(tmin+tmax)/2)?1:-1;
+  }else{
+    var k=Math.max(2,Math.round(BINS*0.15)), sA=0,sB=0;
+    for(i=0;i<k;i++){ sA+=wid[i]; sB+=wid[BINS-1-i]; }
+    armEnd=(sB>=sA)?1:-1;
+  }
+
+  /* 自动找手腕：从手臂端往掌心扫，第一个"局部极小值"就是手腕。
+     注意不能简单用"宽度小于掌宽 x%"——前臂本身就比手掌窄，
+     用阈值判会把整条前臂当手腕，结果切在纸边上等于没切。
+     手腕的特征是"收窄之后又变粗"，所以必须找局部极小 + 回升。
+
+     ⚠ 但要先过一道闸：**只有确认手臂出画（轮廓贴到纸边）才自动切。**
+     手掌本身的腕端也是个窄处，凭局部极小去判，会把好好的手掌切掉一半
+     （实测：128cm² 的手掌被切成 51cm²）。宁可不动，让人用滑块手动调。 */
+  var suggest=null;
+  if(hasArmEdge){
+    var sm=new Float32Array(BINS), s, c2, kk2;
+    for(i=0;i<BINS;i++){
+      s=0; c2=0;
+      for(j=-2;j<=2;j++){ kk2=i+j; if(kk2>=0&&kk2<BINS){ s+=wid[kk2]; c2++; } }
+      sm[i]=c2?s/c2:0;
+    }
+    var start, end, step;
+    if(armEnd>0){ start=BINS-2; end=iMax; step=-1; }
+    else        { start=1;       end=iMax; step=1;  }
+    for(i=start; step>0?(i<end):(i>end); i+=step){
+      var prev=i-step, next=i+step;
+      if(prev<0||prev>=BINS||next<0||next>=BINS) continue;
+      if(!(sm[i]<sm[prev]&&sm[i]<=sm[next])) continue;
+      if(sm[i]>=maxW*0.82) continue;            /* 不够窄，不像手腕 */
+      var up=false;
+      for(j=1;j<=6;j++){
+        var kk=i+step*j;
+        if(kk>=0&&kk<BINS&&sm[kk]>sm[i]*1.15){ up=true; break; }
+      }
+      if(up){ suggest=i/(BINS-1); break; }
+    }
+    if(suggest!==null&&armEnd<0) suggest=1-suggest;   /* 统一成 u 口径 */
+  }
+  return {ax:ax,ay:ay,vx:vx,vy:vy,cx:cx,cy:cy,
+          tmin:tmin,tmax:tmax,wid:wid,BINS:BINS,iMax:iMax,maxW:maxW,
+          armEnd:armEnd,suggest:suggest,edgeN:segT.length};
+}
+
+/* 在 u 处把轮廓切开，保留含掌心的一侧。切不动就返回 null */
+function cutAtNorm(poly,a,u,pxPerCm){
+  if(!a||u===null||u===undefined) return null;
+  var tNorm=(a.armEnd>0)?u:(1-u);
+  var tCut=a.tmin+(a.tmax-a.tmin)*tNorm - a.armEnd*pxPerCm*0.35;
+  var c0=a.ax*a.cx+a.ay*a.cy, nx,ny,d;
+  if(a.armEnd>0){ nx=a.ax;  ny=a.ay;  d=tCut+c0; }
+  else          { nx=-a.ax; ny=-a.ay; d=-tCut-c0; }
+  var side=clipHalfPlane(poly,nx,ny,d);
+  if(side.length<3) return null;
+  var aOld=Math.abs(polyArea(poly)), aNew=Math.abs(polyArea(side));
+  if(aNew<aOld*0.30) return null;        /* 切太狠，判定为失败，不动 */
+  if(aNew/(pxPerCm*pxPerCm)<CFG.AREA_MIN) return null;
+  return {poly:side,tCut:tCut};
+}
+
+function validPaperQuad(corners,w,h){
+  if(!corners||corners.length!==4) return false;
+  var q=corners.map(function(p){return [p.x,p.y];});
+  if(q.some(function(p){return !isFinite(p[0])||!isFinite(p[1])||p[0]<0||p[1]<0||p[0]>w||p[1]>h;})) return false;
+  if(!isConvexQuad(q)||polyArea(q)<w*h*0.03) return false;
+  for(var i=0;i<4;i++){
+    var a=q[i],b=q[(i+1)%4],c=q[(i+2)%4];
+    if(dist(a[0],a[1],b[0],b[1])<Math.min(w,h)*0.04) return false;
+    var cross=(b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0]);
+    if(cross<=w*h*0.0001) return false;
+  }
+  return true;
+}
+function simplePolygon(p){
+  if(p.length<3||polyArea(p)<1) return false;
+  function cr(a,b,c){return (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);}
+  function on(a,b,c){return Math.abs(cr(a,b,c))<1e-7&&c[0]>=Math.min(a[0],b[0])-1e-7&&c[0]<=Math.max(a[0],b[0])+1e-7&&c[1]>=Math.min(a[1],b[1])-1e-7&&c[1]<=Math.max(a[1],b[1])+1e-7;}
+  for(var i=0;i<p.length;i++){
+    var a=p[i],b=p[(i+1)%p.length];if(dist(a[0],a[1],b[0],b[1])<0.5)return false;
+    for(var j=i+1;j<p.length;j++){
+      if(j===i+1||(i===0&&j===p.length-1))continue;
+      var c=p[j],d=p[(j+1)%p.length];
+      var u=cr(a,b,c),v=cr(a,b,d),s=cr(c,d,a),t=cr(c,d,b);
+      if((u*v<0&&s*t<0)||on(a,b,c)||on(a,b,d)||on(c,d,a)||on(c,d,b))return false;
+    }
+  }
+  return true;
+}
+
+/* ---- 切手掌：把"和纸颜色不一样"的那一块抠出来 ---- */
+function segmentPalm(rectCanvas,tolOffset){
+  SEG_FAIL='';
+  var w=Math.max(60,Math.round(rectCanvas.width/CFG.SEG_SCALE));
+  var h=Math.max(60,Math.round(rectCanvas.height/CFG.SEG_SCALE));
+  var small=makeCanvas(w,h);
+  ctx2d(small).drawImage(rectCanvas,0,0,w,h);
+  var img=ctx2d(small).getImageData(0,0,w,h);
+  var n=w*h, i;
+  /* ① 先量纸色，再算色距。取代旧版的"灰度 + Otsu" */
+  var paper=estimatePaperColor(img);
+  var dist=colorDistMap(img,paper);
+  /* ② 阈值取 Otsu 与"纸面自身噪声"的大者，再叠用户拖的容差 */
+  var otsuV=otsu(dist), noiseV=paperNoise95(dist,w,h)*1.8;
+  var base=Math.max(otsuV, noiseV, 46);
+  var thr0=clamp(base-tolOffset,22,230);
+  /* ③ 轻模糊（半径 1，旧版 2）后二值化 */
+  dist=boxBlur(dist,w,h,CFG.SEG_BLUR);
+  var rad=Math.max(1,Math.round(CFG.CLOSE_CM*CFG.PX_PER_CM/CFG.SEG_SCALE));
+  var borderPx=Math.max(2,Math.round(w*0.012));
+  dlg('手掌分割: 纸色 rgb('+paper.join(',')+')  初选阈值 '+Math.round(thr0)+
+      '（Otsu '+Math.round(otsuV)+' / 纸噪 '+Math.round(noiseV)+'）');
+
+  /* 把"阈值 → 前景 → 最大连通块"打包成一个可重试单元。
+     真实课堂照片里白纸褶皱、桌面偏亮、阴影大片，任何单一阈值都可能切不出东西，
+     所以宁可多试几档。判据只看"非纸像素占了多少"——手掌加深色手臂大约占 15%-40%。 */
+  function attempt(t){
+    var fg=new Uint8Array(n);
+    for(var k=0;k<n;k++) fg[k]=dist[k]>t?1:0;
+    var cnt=0; for(k=0;k<n;k++) cnt+=fg[k];
+    var rawPct=cnt/n;
+    fg=clearBorder(fg,w,h,borderPx);
+    fg=morphClose(fg,w,h,rad);
+    var rr=labelComponents(fg,w,h);
+    var b=-1,m=-1;
+    for(k=0;k<rr.count;k++) if(rr.sizes[k].n>m){ m=rr.sizes[k].n; b=k; }
+    return {fg:fg, r:rr, bi:b, bn:m, rawPct:rawPct, pct:m/n, thr:t};
+  }
+  function plausible(A){ return A.bi>=0 && A.pct>=(S.kind==="hand"?CFG.SEG_MIN_FRAC:0.003) && A.pct<=CFG.SEG_MAX_FRAC; }
+
+  var A=attempt(thr0);
+  dlg('  阈值 '+thr0+' → 非纸像素占 '+Math.round(A.rawPct*100)+
+      '%，最大连通块占 '+Math.round(A.pct*100)+'%');
+
+  if(!plausible(A)){
+    /* 逐档下探复查。阴影被当作前景时占比会虚高，阈值太低时占比会虚低，
+       两头的候选都试一遍，取第一个落进合理区间的。 */
+    var lo=Math.round(thr0*0.18);
+    var cands=[];
+    var k;
+    for(k=1;k<=6;k++){ var t1=Math.round(thr0*(1-k*0.13)); if(t1>lo) cands.push(t1); }
+    for(k=1;k<=3;k++){ cands.push(Math.min(230,Math.round(thr0*(1+k*0.22)))); }
+    for(k=0;k<cands.length;k++){
+      var B=attempt(cands[k]);
+      dlg('  复查阈值 '+cands[k]+' → 非纸 '+Math.round(B.rawPct*100)+
+          '%，最大块 '+Math.round(B.pct*100)+'%'+(plausible(B)?'  ← 采用':''));
+      if(plausible(B)){ A=B; break; }
+    }
+  }
+
+  if(!plausible(A)){
+    SEG_FAIL='没有找到大小合理的清晰轮廓；请描轮廓，或让物体与背景的色差更明显。';
+    return null;
+  }
+  for(var ci=0;ci<A.r.count;ci++){
+    if(ci!==A.bi&&A.r.sizes[ci].n>Math.max(100,A.bn*0.2)){
+      SEG_FAIL='发现多个明显的分离区域。每次只放一个物体；阴影干扰时请描轮廓。';return null;
+    }
+  }
+  if(!A.r || !A.r.count || A.bi<0){
+    SEG_FAIL='试了 7 档阈值都切不出成块的前景——手掌和纸的颜色几乎一样，或整张图太暗。';
+    return null;
+  }
+  if(A.bn<40){
+    SEG_FAIL='分割出的斑块全是碎点（最大只有 '+A.bn+' 像素）——画面噪声太大或手掌没进画。';
+    return null;
+  }
+  dlg('  采用阈值 '+A.thr+'，最大连通块 '+A.bn+' 像素（占校正图 '+Math.round(A.pct*100)+'%）');
+
+  var r=A.r, bi=A.bi, sc=r.sizes[bi];
+  var clean=new Uint8Array(n);
+  for(var y=sc.minY;y<=sc.maxY;y++)
+    for(var x=sc.minX;x<=sc.maxX;x++)
+      if(r.lab[y*w+x]===bi) clean[y*w+x]=1;
+  /* 四周补一圈背景，边界追踪才不会卡住 */
+  var pw=w+2, ph=h+2, pad=new Uint8Array(pw*ph);
+  for(var y2=0;y2<h;y2++)
+    for(var x2=0;x2<w;x2++)
+      pad[(y2+1)*pw+(x2+1)]=clean[y2*w+x2];
+  var outline=traceOutline(pad,pw,ph);
+  if(outline.length<12){
+    SEG_FAIL='轮廓点太少（只有 '+outline.length+' 个点）——手掌被切碎了。';
+    return null;
+  }
+  dlg('  轮廓点 '+outline.length+' 个');
+  var pts=[];
+  for(i=0;i<outline.length;i++) pts.push([outline[i][0]-1,outline[i][1]-1]);
+  var simp=simplifyClosed(pts,CFG.SIMPLIFY_EPS);
+  if(simp.length<3){ SEG_FAIL='轮廓简化后不成形。'; return null; }
+  dlg('  简化后 '+simp.length+' 个顶点 → 手掌分割成功');
+  return simp.map(function(q){ return [q[0]*CFG.SEG_SCALE, q[1]*CFG.SEG_SCALE]; });
+}
+
+/* ---- v12 手形自动识别：手部关键点引导逐像素分割，再按腕点截断 ---- */
+var HAND_MODELS_PROMISE=null;
+function loadHandModels(){
+  if(HAND_MODELS_PROMISE)return HAND_MODELS_PROMISE;
+  HAND_MODELS_PROMISE=(async function(){
+    if(location.protocol!=='http:'&&location.protocol!=='https:')
+      throw new Error('自动手形模型需要网页地址。请通过网页服务器打开本文件夹，不能直接点开 index.html。');
+    var mod=await import('./vision_bundle.mjs');
+    var base=new URL('.',location.href);
+    var wasm=await mod.FilesetResolver.forVisionTasks(new URL('wasm',base).href);
+    var hand=await mod.HandLandmarker.createFromModelPath(wasm,new URL('hand_landmarker.task',base).href);
+    try{
+      var segmenter=await mod.InteractiveSegmenter.createFromOptions(wasm,{
+        baseOptions:{modelAssetPath:new URL('magic_touch.tflite',base).href,delegate:'CPU'},
+        outputConfidenceMasks:true,outputCategoryMask:false
+      });
+      return {hand:hand,segmenter:segmenter};
+    }catch(e){hand.close();throw e;}
+  })().catch(function(e){HAND_MODELS_PROMISE=null;throw e;});
+  return HAND_MODELS_PROMISE;
+}
+async function segmentHandML(cv){
+  SEG_FAIL='';
+  var models;
+  try{models=await loadHandModels();}
+  catch(e){SEG_FAIL='自动手形模型加载失败：'+(e&&e.message||e);return null;}
+  var result=models.hand.detect(cv);
+  if(!result.landmarks||result.landmarks.length!==1){
+    SEG_FAIL='没有稳定检测到一只完整的手；请让手掌完整入镜、五指分开后重拍。';return null;
+  }
+  var lm=result.landmarks[0], palmIds=[0,5,9,13,17],sx=0,sy=0;
+  for(var k=0;k<palmIds.length;k++){sx+=lm[palmIds[k]].x;sy+=lm[palmIds[k]].y;}
+  sx/=palmIds.length;sy/=palmIds.length;
+  if(sx<0||sx>1||sy<0||sy>1){SEG_FAIL='手掌中心不在纸面内，请检查 A4 四角或重拍。';return null;}
+  var seg=models.segmenter.segment(cv,{keypoint:{x:sx,y:sy}});
+  if(!seg.confidenceMasks||!seg.confidenceMasks.length){SEG_FAIL='分割模型没有返回手形。';return null;}
+  var mm=seg.confidenceMasks[0], w=mm.width,h=mm.height;
+  var score=mm.getAsFloat32Array();
+  var mask=new Uint8Array(w*h);
+  for(var i=0;i<mask.length;i++)mask[i]=score[i]>=0.5?1:0;
+  mm.close();
+  var groups=labelComponents(mask,w,h),bi=-1,bn=0;
+  for(i=0;i<groups.count;i++)if(groups.sizes[i].n>bn){bn=groups.sizes[i].n;bi=i;}
+  if(bi<0||bn<w*h*0.03){SEG_FAIL='只识别出零碎区域，手形不可信；请重拍。';return null;}
+  var wristX=lm[0].x*w,wristY=lm[0].y*h;
+  var dx=(lm[9].x-lm[0].x)*w,dy=(lm[9].y-lm[0].y)*h;
+  var d=Math.hypot(dx,dy);
+  if(d<Math.min(w,h)*0.04){SEG_FAIL='无法确定手腕方向；请重拍。';return null;}
+  dx/=d;dy/=d;
+  var clean=new Uint8Array(w*h),count=0;
+  for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+    var j=y*w+x;
+    if(groups.lab[j]===bi&&((x-wristX)*dx+(y-wristY)*dy)>=0){clean[j]=1;count++;}
+  }
+  var keep=count/bn;
+  if(keep<0.32||keep>0.92||count<w*h*0.03){
+    SEG_FAIL='自动截腕结果不稳定，不能可靠计算手掌面积；请重拍。';return null;
+  }
+  var pw=w+2,ph=h+2,pad=new Uint8Array(pw*ph);
+  for(y=0;y<h;y++)for(x=0;x<w;x++)pad[(y+1)*pw+x+1]=clean[y*w+x];
+  var outline=traceOutline(pad,pw,ph);
+  if(outline.length<20){SEG_FAIL='自动手形边缘不完整；请重拍。';return null;}
+  var pts=[];
+  for(i=0;i<outline.length;i++)pts.push([(outline[i][0]-1)*cv.width/w,(outline[i][1]-1)*cv.height/h]);
+  var poly=simplifyClosed(pts,1.5);
+  if(poly.length<15){SEG_FAIL='手形轮廓点异常；请重拍。';return null;}
+  dlg('自动手形: 关键点 21 个；分割掩膜 '+w+'×'+h+'；腕部保留 '+Math.round(keep*100)+'%；轮廓 '+poly.length+' 点');
+  return poly;
+}
+
+/* ---- 多边形 → 掩膜 → 积分图 ---- */
+function buildShape(poly,w,h){
+  var mask=rasterizePoly(poly,w,h);
+  return {mask:mask,I:integralOf(mask,w,h),w:w,h:h};
+}
+function polyAreaCm2(poly){
+  return polyArea(poly)/(CFG.PX_PER_CM*CFG.PX_PER_CM);
+}
+/* 轮廓离纸边太近的顶点数 */
+function countEdgeHits(poly,w,h,cm){
+  var lim=cm*CFG.PX_PER_CM, hit=0;
+  for(var i=0;i<poly.length;i++){
+    var p=poly[i];
+    if(p[0]<lim||p[1]<lim||p[0]>w-lim||p[1]>h-lim) hit++;
+  }
+  return hit;
+}
+
+/* ---- 上网格 + 逐格覆盖率 + 统计 ---- */
+function gridStats(shape,gridCm,overrides){
+  if(!shape||gridCm<=0) return null;
+  var w=shape.w,h=shape.h,I=shape.I,cp=gridCm*CFG.PX_PER_CM;
+  var cols=Math.ceil(w/cp),rows=Math.ceil(h/cp),n=cols*rows;
+  var cov=new Float32Array(n),cls=new Uint8Array(n),exact=0;
+  for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
+    var x0=Math.round(c*cp),y0=Math.round(r*cp);
+    var x1=Math.min(w,Math.round((c+1)*cp)),y1=Math.min(h,Math.round((r+1)*cp));
+    var occupied=rectSum(I,w,x0,y0,x1,y1),idx=r*cols+c;
+    // Always use a complete square as the denominator; paper outside the image is background.
+    var ratio=occupied/(cp*cp);cov[idx]=ratio;
+    cls[idx]=ratio>=CFG.FULL_RATIO?2:(occupied>0?1:0);
+    exact+=occupied/(CFG.PX_PER_CM*CFG.PX_PER_CM);
+  }
+  if(overrides)for(var key in overrides)if(Object.prototype.hasOwnProperty.call(overrides,key)){
+    var pr=key.split(','),rr=+pr[0],cc=+pr[1];
+    if(rr>=0&&rr<rows&&cc>=0&&cc<cols&&[0,1,2].indexOf(overrides[key])>=0)cls[rr*cols+cc]=overrides[key];
+  }
+  var full=0,part=0,near=0;
+  for(var i=0;i<n;i++){if(cls[i]===2)full++;else if(cls[i]===1)part++;if(cov[i]>=CFG.NEAR_RATIO&&cov[i]<CFG.FULL_RATIO)near++;}
+  return {cols:cols,rows:rows,cellPx:cp,cov:cov,cls:cls,full:full,part:part,near:near,
+    exact:exact,teachCells:full+part*0.5,teachArea:(full+part*0.5)*gridCm*gridCm,gridCm:gridCm};
+}
+
+/* ---- 主流水线 ---- */
+async function runPipeline(){
+  dstage('识别纸边');
+  busy('正在认纸…'); await nextTick();
+  if(!S.srcCanvas) { busy(false);return; }
+  if(!S.paperConfirmed){
+    if(!S.corners) S.corners=detectPaperBest(S.srcCanvas);
+    busy(false);dstage('核对 A4 四角');
+    dlg(S.corners?'已找到候选纸框，等待核对四角；尚未标定面积。':'未找到纸框，请手动把四点放在真实 A4 纸角。');
+    openEditor('corner');return;
+  }
+  if(!S.corners){
+    var c=detectPaperBest(S.srcCanvas);
+    if(!c){
+      busy(false);
+      dlg('-- 结论: 没认出白纸的四条边 --');
+      dlg('原因: '+PAPER_FAIL);
+      toast('没认出白纸。'+PAPER_FAIL+'（已打开手动点角）',7000);
+      showDiag();
+      /* ⚠⚠ 这里是 openEditor('corner')，不是 openCornerEditor()。
+         曾经写成 openCornerEditor()——一个根本不存在的函数。
+         一调用就抛 ReferenceError，被 startWithFile 的 catch 吞掉，
+         结果是：认纸失败时「手动点角」面板永远打不开，而且日志里还会多出一条
+         假的「两级解码都失败」结论（真 bug，2026-09-30 靠用户发来的日志抓到）。
+         真实的按钮绑定在 btnCorners → openEditor('corner')，两者必须是同一个函数。 */
+      openEditor('corner');
+      return;
+    }
+    S.corners=c;
+  }
+  dstage('透视校正');
+  busy('正在校正…'); await nextTick();
+  var rc=rectify(S.srcCanvas,S.corners);
+  if(!rc){
+    busy(false);
+    dlg('-- 结论: 透视校正失败（四个角点退化，构不出矩形）--');
+    toast('四个角点位置不合理，校正失败。请重新点角，或重拍一张。',5000);
+    showDiag();
+    return;
+  }
+  S.rectCanvas=rc; S.rectW=rc.width; S.rectH=rc.height;
+  dstage('切出手掌');
+  busy('正在切手掌…'); await nextTick();
+  var poly;
+  if(S.kind==='hand'){
+    /* 先在原照片上认手，避免错误纸角把手与袖子扭曲后再送进模型。 */
+    var sourcePoly=await segmentHandML(S.srcCanvas);
+    if(sourcePoly){
+      var srcPts=S.corners.map(function(p){return [p.x,p.y];});
+      var dstPts=[[0,0],[rc.width,0],[rc.width,rc.height],[0,rc.height]];
+      var H=homography(srcPts,dstPts);
+      if(!H){SEG_FAIL='纸角坐标无法换算，请重新调整 A4 四角。';}
+      else poly=sourcePoly.map(function(p){
+        var den=H[6]*p[0]+H[7]*p[1]+1;
+        return [(H[0]*p[0]+H[1]*p[1]+H[2])/den,(H[3]*p[0]+H[4]*p[1]+H[5])/den];
+      });
+    }
+  }else poly=segmentPalm(rc,S.tol-30);
+  if(!poly){
+    busy(false);
+    dlg('-- 结论: 在校正后的纸面上找不到物体 --');
+    dlg('原因: '+(SEG_FAIL||'未识别到可靠轮廓'));
+    toast('没切出可靠轮廓。'+(SEG_FAIL||''),7000);
+    showDiag();
+    /* 手形自动识别失败时不要求课堂上手动描边；保留其他物体的手描入口。 */
+    if(S.kind!=='hand')openEditor('trace');
+    return;
+  }
+  S.rawPoly=poly.slice();
+  S.wristAxis=null; S.wrist=null; S.wristNorm=100;
+  /* 手形在 segmentHandML 中已经按检测到的腕点自动截断。 */
+  if(S.kind==='hand')S.wrist={ml:true};
+  S.poly=poly; S.polyTol=S.tol; S.confirmed=false; S.manualShape=false;
+  $('wrist').value=100;
+  $('wrist').disabled=S.kind==='hand';
+  $('tol').disabled=S.kind==='hand';
+  $('wristVal').textContent=S.kind==='hand'?'自动截腕':(S.wrist?S.wristNorm+'%':'不切');
+  rebuild();
+  busy(false);
+  dstage('核对物体轮廓');
+  dlg('候选轮廓已生成，请核对照片与轮廓；计算完成不等于实物测量已验证。');
+  aftershape();
+}
+
+/* 每次形状/参数变化后重算 */
+function rebuild(){
+  if(!S.poly){ return; }
+  S.shape=buildShape(S.poly,S.rectW,S.rectH);
+  /* 面积一律以栅格化后的掩膜为准。
+     多边形若出现自交，鞋带公式会算出离谱的值（曾出现 1800cm²），
+     而掩膜才是真正参与数格的那一份，两者必须一致。 */
+  var px=0, m=S.shape.mask, i;
+  for(i=0;i<m.length;i++) px+=m[i];
+  S.areaCm2=px/(CFG.PX_PER_CM*CFG.PX_PER_CM);
+  S.stat=gridStats(S.shape,S.gridCm,S.overrides);
+  render();
+  updatePanel();
+}
+
+/* 形状刚定下来时的检查与提醒 */
+function aftershape(){
+  var a=S.areaCm2;
+  /* 自检：多边形自交时鞋带面积会远大于实际填充面积 */
+  var sh=polyArea(S.poly)/(CFG.PX_PER_CM*CFG.PX_PER_CM);
+  if(sh>a*1.3){
+    toast('轮廓没追踪对，点【描轮廓】用手指沿手掌边缘描一圈',5200);
+    return;
+  }
+  if(S.kind==="hand"&&(a<CFG.AREA_MIN||a>CFG.AREA_MAX)){
+    var tip=S.kind==='hand'?'请核对 A4 四角；若纸角无误，请重拍。'
+      :(S.wristAxis?'把右边【截掉手臂】滑块往左拖':'请重拍或描轮廓');
+    toast('识别到的面积是 '+fmt(a)+' cm²，明显不对。'+tip,5600);
+  } else if(countEdgeHits(S.poly,S.rectW,S.rectH,CFG.EDGE_WARN_CM)>0){
+    toast('手掌或影子压到纸边了，超出纸面的部分没算进去。建议重拍',4800);
+  } else if(!S.wrist&&S.wristAxis&&S.wristAxis.edgeN>0&&S.wristAxis.suggest===null){
+    toast('没看出手腕在哪。要是把手臂也算进去了，拖【截掉手臂】滑块手动切',4200);
+  } else if(S.stat&&S.stat.near>0&&S.viewMode==='grid'){
+    toast('有 '+S.stat.near+' 个格子正好压在边缘，判定可能有偏差。打开【修改格子】可以手动改',4600);
+  }
+}
+
+/* =====================================================================
+   模块 C · 渲染
+   ===================================================================== */
+
+var V={cw:0,ch:0,dpr:1};
+
+function resizeView(){
+  var dpr=Math.min(2,window.devicePixelRatio||1);
+  var w=stage.clientWidth||360, h=stage.clientHeight||360;
+  view.width=Math.round(w*dpr); view.height=Math.round(h*dpr);
+  view.style.width=w+'px'; view.style.height=h+'px';
+  vctx.setTransform(dpr,0,0,dpr,0,0);
+  V.cw=w; V.ch=h; V.dpr=dpr;
+}
+
+function strokePoly(poly,color,lw){
+  if(!poly||poly.length<2) return;
+  vctx.strokeStyle=color; vctx.lineWidth=lw;
+  vctx.lineJoin='round'; vctx.lineCap='round';
+  vctx.beginPath();
+  vctx.moveTo(poly[0][0],poly[0][1]);
+  for(var i=1;i<poly.length;i++) vctx.lineTo(poly[i][0],poly[i][1]);
+  vctx.closePath(); vctx.stroke();
+}
+function fillPoly(poly,color){
+  if(!poly||poly.length<3) return;
+  vctx.fillStyle=color; vctx.beginPath();
+  vctx.moveTo(poly[0][0],poly[0][1]);
+  for(var i=1;i<poly.length;i++) vctx.lineTo(poly[i][0],poly[i][1]);
+  vctx.closePath(); vctx.fill();
+}
+
+/* 手形先于格子：保留轮廓内的真实照片，轮廓外的照片退淡。
+   学生先核对手指、指缝和腕线，再切到数格视图。 */
+function paintPaperContents(s){
+  vctx.fillStyle='#FFFFFF';
+  vctx.fillRect(0,0,S.rectW,S.rectH);
+  if(S.viewMode==='shape'){
+    if(S.showPhoto&&S.rectCanvas){
+      vctx.save();
+      vctx.globalAlpha=0.22;
+      vctx.drawImage(S.rectCanvas,0,0);
+      vctx.restore();
+      if(S.poly&&S.poly.length>=3){
+        vctx.save();
+        vctx.beginPath();
+        vctx.moveTo(S.poly[0][0],S.poly[0][1]);
+        for(var pi=1;pi<S.poly.length;pi++) vctx.lineTo(S.poly[pi][0],S.poly[pi][1]);
+        vctx.closePath();vctx.clip();
+        vctx.drawImage(S.rectCanvas,0,0);
+        vctx.fillStyle='rgba(239,159,39,0.13)';
+        vctx.fillRect(0,0,S.rectW,S.rectH);
+        vctx.restore();
+      }
+    }else fillPoly(S.poly,'#F8D79A');
+  }else{
+    if(S.showPhoto&&S.rectCanvas){
+      vctx.save();vctx.globalAlpha=0.5;vctx.drawImage(S.rectCanvas,0,0);vctx.restore();
+    }
+    drawCells();
+  }
+  drawGrid();
+  if(S.poly){
+    strokePoly(S.poly,'rgba(255,255,255,0.95)',Math.max(1.8,5/s));
+    strokePoly(S.poly,'#163B56',Math.max(1.0,2.8/s));
+  }
+  drawWristLine(s);
+}
+
+function render(){
+  if(!S.rectW){ vctx.clearRect(0,0,V.cw,V.ch); return; }
+  var cw=V.cw, ch=V.ch;
+  vctx.clearRect(0,0,cw,ch);
+  vctx.fillStyle='#E6E4DE'; vctx.fillRect(0,0,cw,ch);
+  var pad=30;
+  var base=Math.min((cw-pad*2)/S.rectW,(ch-pad*2)/S.rectH);
+  if(!isFinite(base)||base<=0) base=0.3;
+  var s=base*S.zoom;
+  var ox=(cw-S.rectW*s)/2+S.panX;
+  var oy=(ch-S.rectH*s)/2+S.panY;
+  S.viewScale=s; S.ox=ox; S.oy=oy;
+
+  vctx.save();
+  vctx.translate(ox,oy); vctx.scale(s,s);
+
+  paintPaperContents(s);
+  if(S.showCoord) drawCoords(s);
+
+  vctx.restore();
+
+  vctx.strokeStyle='#B4B2A9'; vctx.lineWidth=1;
+  vctx.strokeRect(ox+0.5,oy+0.5,S.rectW*s,S.rectH*s);
+  drawHintText();
+}
+
+/* 手腕截断线：得让人看得见"手臂是在哪儿切掉的"。
+   不画这条线，学生只会看到面积数字莫名其妙变小。
+   ⚠ 线段长度必须裁剪到轮廓的跨度。曾经按 rectW+rectH 全长画，
+   结果是一条从画面左下角斜穿出去的虚线，看起来像切错了位置。 */
+function drawWristLine(s){
+  var wt=S.wrist; if(!wt||!wt.axis) return;
+  var a=wt.axis;
+  var px=a.cx+a.ax*wt.tCut, py=a.cy+a.ay*wt.tCut;
+  var ref=S.rawPoly||S.poly||[];
+  var tmin=1e9, tmax=-1e9, i;
+  for(i=0;i<ref.length;i++){
+    var t=(ref[i][0]-px)*a.vx + (ref[i][1]-py)*a.vy;
+    if(t<tmin) tmin=t;
+    if(t>tmax) tmax=t;
+  }
+  if(tmin>tmax){ tmin=-CFG.PX_PER_CM*2; tmax=CFG.PX_PER_CM*2; }
+  var pad=CFG.PX_PER_CM*1.5;
+  tmin-=pad; tmax+=pad;
+  vctx.save();
+  vctx.strokeStyle='#C0392B';
+  vctx.lineWidth=Math.max(1,2.2/s);
+  vctx.setLineDash([9/s,7/s]);
+  vctx.beginPath();
+  vctx.moveTo(px+a.vx*tmin,py+a.vy*tmin);
+  vctx.lineTo(px+a.vx*tmax,py+a.vy*tmax);
+  vctx.stroke();
+  vctx.restore();
+}
+
+function drawCells(){
+  var st=S.stat; if(!st) return;
+  var cp=st.cellPx, r, c, k, idx, i;
+  /* 关键：色块按手掌轮廓裁掉。
+     以前是把整个格子涂成实心方块 —— 画出来是一片方方正正的色块，
+     一点都不像手掌，学生也看不出"这格只盖了一半"。
+     按轮廓裁过之后，只有被手掌盖住的那部分着色，这才是课本里数方格的样子。 */
+  var clip=S.poly;
+  var doClip=clip&&clip.length>=3;
+  if(doClip){
+    vctx.save();
+    vctx.beginPath();
+    vctx.moveTo(clip[0][0],clip[0][1]);
+    for(i=1;i<clip.length;i++) vctx.lineTo(clip[i][0],clip[i][1]);
+    vctx.closePath();
+    vctx.clip();
+  }
+  var offs=[];
+  for(r=0;r<st.rows;r++){
+    for(c=0;c<st.cols;c++){
+      idx=r*st.cols+c; k=st.cls[idx];
+      if(!k) continue;
+      var onFilter = (S.filter==='all') || (S.filter==='full'&&k===2) || (S.filter==='part'&&k===1);
+      vctx.globalAlpha = onFilter?1:0.1;
+      var x=c*cp, y=r*cp;
+      if(k===2){
+        vctx.fillStyle='#EF9F27';        /* 满格：实心橙 */
+        vctx.fillRect(x,y,cp,cp);
+      }else{
+        vctx.fillStyle='#FDF1DC';        /* 不满格：浅底 + 斜纹 */
+        vctx.fillRect(x,y,cp,cp);
+        if(onFilter) offs.push([x,y]);
+      }
+    }
+  }
+  /* 不满格加斜纹。教材里就是这么区分"数满格"和"估不满格"的。
+     只靠颜色深浅根本不行——平板缩略图上一片橘，学生分不出哪个是满格。 */
+  if(offs.length){
+    var step=Math.max(3.2,cp/3.2);
+    vctx.save();
+    vctx.beginPath();
+    for(i=0;i<offs.length;i++) vctx.rect(offs[i][0],offs[i][1],cp,cp);
+    vctx.clip();
+    vctx.strokeStyle='#E3A03A';
+    vctx.lineWidth=Math.max(0.5,1.0/S.viewScale);
+    vctx.beginPath();
+    for(i=0;i<offs.length;i++){
+      var ox=offs[i][0], oy=offs[i][1];
+      for(var d=0;d<cp*2;d+=step){
+        vctx.moveTo(ox+d-cp,oy);
+        vctx.lineTo(ox+d,oy+cp);
+      }
+    }
+    vctx.stroke();
+    vctx.restore();
+  }
+  if(doClip) vctx.restore();
+  vctx.globalAlpha=1;
+}
+
+function drawGrid(){
+  var st=S.stat;if(!st)return;var cp=st.cellPx,W=S.rectW,H=S.rectH;
+  vctx.save();
+  vctx.globalAlpha=S.viewMode==='shape'?0.34:0.75;
+  vctx.strokeStyle='#B4B2A9';vctx.lineWidth=Math.max(0.4,0.9/S.viewScale);vctx.beginPath();
+  for(var i=0;i<=st.cols;i++){var x=Math.min(i*cp,W);vctx.moveTo(x,0);vctx.lineTo(x,H);}
+  for(i=0;i<=st.rows;i++){var y=Math.min(i*cp,H);vctx.moveTo(0,y);vctx.lineTo(W,y);}
+  vctx.stroke();
+  vctx.restore();
+}
+
+function drawCoords(s){
+  var st=S.stat; if(!st) return;
+  var cp=st.cellPx;
+  if(cp*s<15) return;               /* 太密就不画，免得糊成一片 */
+  var fs=11/s, r, c;
+  vctx.fillStyle='#5F5E5A';
+  vctx.font='500 '+fs.toFixed(2)+'px sans-serif';
+  vctx.textAlign='center'; vctx.textBaseline='bottom';
+  for(c=0;c<st.cols;c++) vctx.fillText(String(c+1),(c*cp+Math.min((c+1)*cp,S.rectW))/2,-5/s);
+  vctx.textAlign='right'; vctx.textBaseline='middle';
+  for(r=0;r<st.rows;r++) vctx.fillText(String(r+1),-5/s,(r*cp+Math.min((r+1)*cp,S.rectH))/2);
+}
+
+function drawHintText(){
+  if(S.stat&&S.stat.full+S.stat.part===0){
+    vctx.fillStyle='#8A8880'; vctx.font='16px sans-serif';
+    vctx.textAlign='center'; vctx.textBaseline='middle';
+    vctx.fillText('没有识别到完整物体，点【描轮廓】试试',V.cw/2,V.ch-24);
+  }
+}
+
+/* ---------------- 右侧数字面板 ---------------- */
+function updatePanel(){
+  var st=S.stat;
+  $('btnCard').disabled=!st||!S.confirmed;
+  $('btnCompare').disabled=!st||!S.confirmed;
+  $('btnVerify').disabled=!st||S.confirmed;
+  $('areaLabel').textContent=S.confirmed?'估算面积':'估算面积（待核对）';
+  $('resultStatus').textContent=!st?'尚未得到结果，请先核对 A4 四角':
+    (S.confirmed?'已核对轮廓；面积仍为估算值':'先看手形视图：深蓝边线是否贴合物体？'+(S.kind==='hand'?'手腕是否已切掉？':'物体是否完整？')+'核对后确认结果。');
+  var warning=$('shapeWarning');
+  var armRisk=!!(st&&S.kind==='hand'&&!S.wrist&&
+    (countEdgeHits(S.poly,S.rectW,S.rectH,CFG.EDGE_WARN_CM)>0 ||
+     (S.wristAxis&&S.wristAxis.edgeN>0)));
+  warning.style.display=armRisk?'block':'none';
+  warning.textContent=armRisk?(S.wristAxis
+    ?'前臂可能仍算在手形里。请拖下方「截掉手臂」滑块到手腕；若切线不对，点「涂抹修边」擦掉多余部分。'
+    :'手形碰到纸边，前臂可能被算进去。请点「涂抹修边」擦掉多余部分。'):'';
+  if(!st){
+    $('areaVal').textContent='--'; $('fullCnt').textContent='--';
+    $('partCnt').textContent='--'; $('cellCnt').textContent='--';
+    $('exactVal').textContent='--';
+    return;
+  }
+  $('areaVal').textContent=fmt(st.teachArea,1);
+  $('fullCnt').textContent=st.full+' 个';
+  $('partCnt').textContent=st.part+' 个';
+  $('cellCnt').textContent=fmt(st.teachCells,1)+' 格';
+  $('exactVal').textContent=fmt(st.exact,1);
+}
+
+/* ---------------- 三档对比 ---------------- */
+async function buildCompare(){
+  busy('正在算三档…'); await nextTick();
+  var rows=[], i;
+  var maxArea=0;
+  for(i=0;i<CFG.GRIDS.length;i++){
+    var g=CFG.GRIDS[i];
+    var st=gridStats(S.shape,g,(g===S.gridCm)?S.overrides:{});
+    if(!st) continue;
+    rows.push(st);
+    if(st.teachArea>maxArea) maxArea=st.teachArea;
+  }
+  /* The full mask reference is independent of grid size. */
+  var exact=S.areaCm2;
+  /* 条形画的是「离精确值差多少」。
+     画面积本身没用——三档面积本来就都接近精确值，条形会一样长，看不出差别。 */
+  var maxErr=0;
+  for(i=0;i<rows.length;i++){
+    var e0=Math.abs(rows[i].teachArea-exact);
+    if(e0>maxErr) maxErr=e0;
+  }
+  var body=$('cmpBody');
+  body.innerHTML='';
+  for(i=0;i<rows.length;i++){
+    var r=rows[i];
+    var err=r.teachArea-exact;
+    var wpc=(maxErr>0)?Math.max(3,Math.round(Math.abs(err)/maxErr*100)):0;
+    var d=document.createElement('div');
+    d.className='cmp-row'+(r.gridCm===S.gridCm?' sel':'');
+    d.innerHTML=
+      '<div class="cmp-tag">'+r.gridCm+'cm</div>'+
+      '<div class="cmp-num">'+fmt(r.teachArea,1)+'</div>'+
+      '<div class="cmp-bar"><div class="cmp-fill'+(r.gridCm===S.gridCm?'':' dim')+
+        '" style="width:'+wpc+'%"></div></div>'+
+      '<div class="cmp-err">差距 '+fmt(Math.abs(err),1)+'</div>';
+    body.appendChild(d);
+    var sub=document.createElement('div');
+    sub.style.cssText='font-size:13px;color:#8A8880;text-align:left;padding:0 0 6px 62px';
+    var tot=r.full+r.part;
+    var pctFull=tot?Math.round(r.full/tot*100):0;
+    sub.textContent='满格 '+r.full+' 个 · 不满格 '+r.part+' 个 · 共 '+
+      (r.cols*r.rows)+' 格　→　满格占 '+pctFull+'%（要估的占 '+(100-pctFull)+'%）';
+    body.appendChild(sub);
+  }
+  var base=document.createElement('div');
+  base.className='base-line';
+  base.innerHTML='<div class="cmp-tag">轮廓参考</div>'+
+    '<div class="cmp-num">'+fmt(exact,1)+'</div>'+
+    '<div class="cmp-bar" style="background:transparent"></div>'+
+    '<div class="cmp-err">差距 0</div>';
+  body.appendChild(base);
+  var note=document.createElement('div');
+  note.className='cmp-note';
+  note.textContent='每格面积 = 边长 × 边长；估算面积 =（满格数 + 不满格数 × 0.5）× 每格面积。'+
+    '更细的方格有助于减少边界估算的不确定性，但某一次估算不保证逐档更接近参考面积，数字也不一定变小。'+
+    '参考面积来自当前识别轮廓，不是对真实物体面积的独立测量。纸边剩余区域也已统计；满格采用覆盖率至少 95% 的近似判定。';
+  body.appendChild(note);
+  busy(false);
+  $('cmpSheet').classList.add('on');
+}
+
+/* =====================================================================
+   模块 D · 交互 · 编辑器 · 结果卡片 · 示例图 · 初始化
+   ===================================================================== */
+
+/* ---------------- 读图 ----------------
+   为什么写这么啰嗦：安卓相册/文件管理器返回的照片格式五花八门，
+   单一走 URL.createObjectURL 在部分机型/内置浏览器上会直接 onerror。
+   所以分两级试，两级都挂才报错，并且报错要带上「文件信息 + 哪级挂的 + 挂在哪」。 */
+function fileInfo(f){
+  var name=(f&&f.name)||'(无文件名)';
+  var type=(f&&f.type)||'(无 MIME)';
+  var size=(f&&typeof f.size==='number')?f.size:0;
+  var ext='';
+  var m=/\.([A-Za-z0-9]{2,5})$/.exec(name);
+  if(m) ext=m[1].toLowerCase();
+  return {name:name,type:type,size:size,ext:ext};
+}
+
+/* 用一个 Image 去解一个 URL，带超时（个别机型的解码器会卡住不回调） */
+function imgFromURL(url){
+  return new Promise(function(res,rej){
+    var img=new Image(), done=false;
+    var timer=setTimeout(function(){
+      if(done) return; done=true; rej(new Error('超时未回调(解码器卡住)'));
+    },12000);
+    img.onload=function(){
+      if(done) return; done=true; clearTimeout(timer);
+      if(!img.naturalWidth||!img.naturalHeight){ rej(new Error('解码出 0×0 空图')); return; }
+      res(img);
+    };
+    img.onerror=function(){
+      if(done) return; done=true; clearTimeout(timer);
+      rej(new Error('onerror(浏览器不支持这种编码或文件损坏)'));
+    };
+    img.src=url;
+  });
+}
+
+/* 把 Image 画进 canvas；drawImage 抛异常时也要能被抓到，不然 Promise 会永远挂着 */
+function cvFromImg(img){
+  var sc=Math.min(1,CFG.LOAD_MAX/Math.max(img.naturalWidth,img.naturalHeight));
+  var w=Math.max(1,Math.round(img.naturalWidth*sc));
+  var h=Math.max(1,Math.round(img.naturalHeight*sc));
+  var cv=makeCanvas(w,h);
+  ctx2d(cv).drawImage(img,0,0,w,h);
+  return cv;
+}
+
+/* ImageBitmap → canvas。这一级专门对付"大图 OOM"：
+   手机主摄默认动辄 50MP/108MP，<img> 解码要先把整张图铺进内存
+   （108MP ≈ 430MB RGBA），安卓平板常常直接解码失败。
+   createImageBitmap 支持边解码边缩放，内存峰值低一个量级。 */
+function cvFromBitmap(bmp){
+  var w=bmp.width, h=bmp.height;
+  var sc=Math.min(1,CFG.LOAD_MAX/Math.max(w,h));
+  var ow=Math.max(1,Math.round(w*sc)), oh=Math.max(1,Math.round(h*sc));
+  var cv=makeCanvas(ow,oh);
+  ctx2d(cv).drawImage(bmp,0,0,ow,oh);
+  if(bmp.close) bmp.close();
+  return cv;
+}
+
+function readAsDataURL(file){
+  return new Promise(function(res,rej){
+    var fr=new FileReader();
+    fr.onload=function(){ if(fr.result) res(fr.result); else rej(new Error('FileReader 返回空')); };
+    fr.onerror=function(){ rej(new Error('FileReader onerror(文件读不出来)')); };
+    fr.onabort=function(){ rej(new Error('FileReader 被中断')); };
+    fr.readAsDataURL(file);
+  });
+}
+
+async function loadFile(file){
+  if(!file) throw new Error('nofile');
+  var fi=fileInfo(file);
+  dlg('文件: ' + fi.name);
+  dlg('  类型: ' + fi.type + '  后缀: ' + (fi.ext||'-'));
+  dlg('  大小: ' + (fi.size/1048576).toFixed(2) + ' MB');
+  if(!fi.size){ dlg('  ✗ 文件大小 0，相册没把真实内容传过来'); }
+
+  /* 第 1 级：blob URL —— 最快、最省内存，绝大多数情况走这里 */
+  var url=null, e1=null;
+  try{
+    url=URL.createObjectURL(file);
+    var img=await imgFromURL(url);
+    dlg('第1级 blobURL: OK  ' + img.naturalWidth + '×' + img.naturalHeight);
+    return cvFromImg(img);
+  }catch(e){
+    e1=e; dlg('第1级 blobURL: ✗ ' + e.message);
+  }finally{
+    if(url) URL.revokeObjectURL(url);
+  }
+
+  /* 第 2 级：FileReader → dataURL —— 绕开个别 webview 对 blob: 协议的拦截 */
+  try{
+    var durl=await readAsDataURL(file);
+    dlg('第2级 dataURL: 已读到 ' + Math.round(durl.length/1024) + ' KB 文本，开始解码');
+    var img2=await imgFromURL(durl);
+    dlg('第2级 dataURL: OK  ' + img2.naturalWidth + '×' + img2.naturalHeight);
+    return cvFromImg(img2);
+  }catch(e2){
+    dlg('第2级 dataURL: ✗ ' + e2.message);
+
+    /* 第 3 级：createImageBitmap —— 专门救"超大一拍就挂"的手机主摄大图。
+       它支持解码时直接缩放，不必把整张原图铺进内存。
+       在 file:// 与本地 File 上不需要任何权限或跨域许可。
+       ⚠ 实测：面对损坏/不支持的数据，它可能既不 resolve 也不 reject 一直挂着，
+       所以必须包一层超时，否则整个读图流程会永久停在这里（界面卡在"正在读取照片"）。 */
+    if(typeof createImageBitmap==='function'){
+      try{
+        var bmp=await Promise.race([
+          createImageBitmap(file,{resizeWidth:CFG.LOAD_MAX,resizeQuality:'high'}),
+          new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('超时 8 秒未返回')); },8000); })
+        ]);
+        dlg('第3级 createImageBitmap: OK  ' + bmp.width+'×'+bmp.height);
+        return cvFromBitmap(bmp);
+      }catch(e3){
+        dlg('第3级 createImageBitmap: ✗ ' + (e3&&e3.message||e3));
+      }
+    }else{
+      dlg('第3级 createImageBitmap: 本浏览器不支持该 API，跳过');
+    }
+
+    var err=new Error('allfail');
+    err.first=e1; err.fi=fi;
+    throw err;
+  }
+}
+
+function resetState(cv){
+  if(tolTimer)clearTimeout(tolTimer);if(wristTimer)clearTimeout(wristTimer);
+  S.srcCanvas=cv||null; S.corners=null; S.rectCanvas=null;S.rectW=0;S.rectH=0;
+  S.confirmed=false;S.paperConfirmed=false;S.landscape=null;S.manualShape=false;
+  closeSheet();$('brushSheet').classList.remove('on');$('cmpSheet').classList.remove('on');
+  $('tol').disabled=false;$('wrist').disabled=false;
+  $('wristRow').style.display='none';
+  $('tolRow').style.display=S.kind==='hand'?'none':'flex';
+  S.poly=null; S.polyTol=null; S.shape=null; S.stat=null;
+  S.rawPoly=null; S.wristAxis=null; S.wrist=null; S.wristNorm=100;
+  S.editCells=false;
+  S.overrides={}; S.undoStack=[]; S.zoom=1; S.panX=0; S.panY=0;
+  S.areaCm2=0; S.gridCm=1; S.viewMode='shape'; S.tol=CFG.TOL_DEFAULT;
+  S.filter='all'; S.showPhoto=true;
+  $('tol').value=CFG.TOL_DEFAULT; $('tolVal').textContent=CFG.TOL_DEFAULT;
+  $('wrist').value=100; $('wristVal').textContent='自动';
+  $('chkEdit').checked=false;
+  var gs=$('gridSeg').children;
+  for(var i=0;i<gs.length;i++) gs[i].classList.toggle('on',gs[i].getAttribute('data-cm')==='1');
+  var vs=$('viewSeg').children;
+  for(var vi=0;vi<vs.length;vi++) vs[vi].classList.toggle('on',vs[vi].getAttribute('data-view')==='shape');
+  var fs=$('filterSeg').children;
+  for(var j=0;j<fs.length;j++) fs[j].classList.toggle('on',fs[j].getAttribute('data-f')==='all');
+  $('chkPhoto').checked=true;
+  cellInfo.classList.remove('on');updatePanel();render();
+}
+
+async function startWithCanvas(cv){
+  if(!DIAG.log.length) dreset();
+  resetState(cv);
+  showScreen('work');
+  resizeView();
+  await nextTick();
+  await runPipeline();
+}
+
+var loading=false;
+async function startWithFile(file){
+  /* 防重入：连点两次「选照片」、或某些浏览器把一次选择派发成两次 change，
+     会让两遍流程并行跑，日志互相覆盖、界面数字乱跳。直接忽略第二次。 */
+  if(loading) return;
+  loading=true;
+  dreset(); hideDiag(); resetState(null);
+  try{
+    /* ---------- 第一步：解码照片 ----------
+       只有这一步的失败才配叫"这张图读不出来"。 */
+    var cv;
+    try{
+      busy('正在读取照片…'); await nextTick();
+      cv=await loadFile(file);
+    }catch(e){
+      busy(false);
+      if(e && e.message==='nofile'){
+        dlg('✗ 浏览器根本没把文件传进来（file 为 null）');
+        toast('没拿到照片文件。请重新点【从相册选择】选一次。',5000);
+        showDiag();
+        return;
+      }
+      var fi=(e&&e.fi)||fileInfo(file);
+      var isHeic=/hei[cf]|avif|dng|tiff?|raw/i.test(fi.type+' '+fi.ext);
+      dlg('-- 结论: 三级解码都失败，浏览器打不开这张照片 --');
+      dlg('判定: ' + (isHeic
+        ? ('文件后缀 .'+String(fi.ext||'').toUpperCase()+' / 类型 '+fi.type+'，属于浏览器原生不支持的格式族')
+        : ('后缀 .'+String(fi.ext||'-').toUpperCase()+' / 类型 '+fi.type+'，不是特殊格式——更可能是文件损坏、被截断，或来自微信/QQ 的临时文件')));
+      var msg;
+      if(isHeic){
+        msg='这张是 '+String(fi.ext||'').toUpperCase()+' 格式，浏览器解不开。先在相册里把它另存为 JPG，或直接用相机重拍。';
+      }else{
+        msg='浏览器打不开这张照片。请用相机 App 重拍一张（不要从微信/QQ 里另存），或先在相册里截个图再选。';
+      }
+      toast(msg,7000);
+      showDiag();
+      return;
+    }
+
+    /* ---------- 第二步：识别流程 ----------
+       ⚠⚠ 这一步的异常绝对不能写成"浏览器打不开这张照片"。
+       2026-09-30 的真实 bug：openCornerEditor 未定义抛 ReferenceError，
+       被下面这个 catch 一律当成解码失败，于是诊断日志出现自相矛盾的结论——
+       上面写"没认出白纸的四条边"，最后两行却写"两级解码都失败"，
+       用户拿着这份日志完全没法判断，我也被带偏。
+       现在两步分开，第二步的异常照实报，并附堆栈。 */
+    try{
+      busy(false);
+      await startWithCanvas(cv);
+    }catch(e){
+      busy(false);
+      dstage('识别流程内部');
+      dlg('-- 结论: 照片读到了，是识别过程本身出错 --');
+      dlg('异常: '+((e&&e.message)||e));
+      dlg('位置: '+String((e&&e.stack)||'').split('\n').slice(0,3).join(' ／ '));
+      toast('识别过程出错（照片没问题）。点右上角 ⓘ 把详情发我。',6000);
+      showDiag();
+    }
+  }finally{
+    loading=false;
+  }
+}
+
+/* ---------------- 缩放 / 平移 / 点格 ---------------- */
+var ptrs={}, lastDist=0, dragMoved=false;
+
+function mid(a,b){ return {x:(a.x+b.x)/2,y:(a.y+b.y)/2}; }
+
+function setZoom(nz,cx,cy){
+  nz=clamp(nz,0.5,8);
+  var s0=S.viewScale;
+  if(!s0||!isFinite(s0)){ S.zoom=nz; return; }
+  var ix=(cx-S.ox)/s0, iy=(cy-S.oy)/s0;
+  var base=s0/S.zoom, s1=base*nz;
+  S.zoom=nz;
+  S.panX=(cx-ix*s1)-(V.cw-S.rectW*s1)/2;
+  S.panY=(cy-iy*s1)-(V.ch-S.rectH*s1)/2;
+}
+
+function localPos(e){
+  var r=view.getBoundingClientRect();
+  return {x:e.clientX-r.left,y:e.clientY-r.top};
+}
+
+stage.addEventListener('pointerdown',function(e){
+  if(!elWork.classList.contains('on')) return;
+  ptrs[e.pointerId]=localPos(e);
+  dragMoved=false;
+  var k=Object.keys(ptrs);
+  if(k.length===2){
+    lastDist=dist(ptrs[k[0]].x,ptrs[k[0]].y,ptrs[k[1]].x,ptrs[k[1]].y);
+  }
+});
+stage.addEventListener('pointermove',function(e){
+  if(!ptrs[e.pointerId]) return;
+  var prev=ptrs[e.pointerId], now=localPos(e);
+  ptrs[e.pointerId]=now;
+  var k=Object.keys(ptrs);
+  if(k.length===1){
+    var dx=now.x-prev.x, dy=now.y-prev.y;
+    if(Math.abs(dx)+Math.abs(dy)>3) dragMoved=true;
+    S.panX+=dx; S.panY+=dy; render();
+  }else if(k.length>=2){
+    var p1=ptrs[k[0]], p2=ptrs[k[1]];
+    var d=dist(p1.x,p1.y,p2.x,p2.y);
+    if(lastDist>4&&d>4){
+      var m=mid(p1,p2);
+      setZoom(S.zoom*(d/lastDist),m.x,m.y);
+    }
+    lastDist=d; dragMoved=true; render();
+  }
+  e.preventDefault();
+},{passive:false});
+function endPtr(e){
+  var n=Object.keys(ptrs).length;
+  delete ptrs[e.pointerId];
+  if(n<=1) lastDist=0;
+  if(n===1&&!dragMoved){ var p=localPos(e); handleTap(p.x,p.y); }
+}
+stage.addEventListener('pointerup',endPtr);
+stage.addEventListener('pointercancel',function(e){ delete ptrs[e.pointerId]; lastDist=0; });
+
+function handleTap(px,py){
+  if(!S.stat){ return; }
+  var s=S.viewScale;
+  if(!s||!isFinite(s)) return;
+  var ix=(px-S.ox)/s, iy=(py-S.oy)/s;
+  var st=S.stat;
+  var c=Math.floor(ix/st.cellPx), r=Math.floor(iy/st.cellPx);
+  if(c<0||r<0||c>=st.cols||r>=st.rows) return;
+  /* 默认只读。点一下只是"看这一格的信息"，不改判定。
+     三四年级学生必然会误触，而误触会静默改掉统计结果、学生毫不知情。
+     要改判定必须先打开面板上的【修改格子】开关。 */
+  if(!S.editCells){ showCellInfo(r,c); return; }
+  var key=r+','+c;
+  var cur=(S.overrides[key]!==undefined)?S.overrides[key]:st.cls[r*st.cols+c];
+  var next=(cur===0)?2:((cur===2)?1:0);
+  S.undoStack.push({key:key,prev:S.overrides[key]});
+  S.overrides[key]=next;
+  S.stat=gridStats(S.shape,S.gridCm,S.overrides);
+  render(); updatePanel();
+  showCellInfo(r,c);
+}
+
+function showCellInfo(r,c){
+  var st=S.stat; if(!st) return;
+  var idx=r*st.cols+c, cov=st.cov[idx], k=st.cls[idx];
+  var name=(k===2)?'满格':((k===1)?'不满格':'空格子');
+  var manual=(S.overrides[r+','+c]!==undefined);
+  var tail=S.editCells
+    ? '<span style="color:#B4B2A9"> 再点一下改成'+(k===2?'不满格':(k===1?'空格子':'满格'))+'</span>'
+    : '<span style="color:#B4B2A9"> 想改判定，先打开下面的【修改格子】</span>';
+  cellInfo.innerHTML='第 '+(r+1)+' 行 · 第 '+(c+1)+' 列<br>'+
+    '被物体占了 '+fmt(cov*100,0)+'%<br>判定：'+name+
+    (manual?'<span style="color:#B15F0A">（手动改的）</span>':'')+tail;
+  cellInfo.classList.add('on');
+  if(showCellInfo._t) clearTimeout(showCellInfo._t);
+  showCellInfo._t=setTimeout(function(){ cellInfo.classList.remove('on'); },3800);
+}
+
+/* ---------------- 参数控件 ---------------- */
+function setGrid(cm){
+  if(CFG.GRIDS.indexOf(cm)<0)return;
+  S.gridCm=cm;
+  var gs=$('gridSeg').children;
+  for(var i=0;i<gs.length;i++) gs[i].classList.toggle('on',+gs[i].getAttribute('data-cm')===cm);
+  /* 格子换档后，之前手动改的格子对应关系就变了，必须清空 */
+  if(Object.keys(S.overrides).length){
+    S.overrides={}; S.undoStack=[];
+    toast('换了格子大小，手动改过的格子已还原',2600);
+  }
+  S.stat=gridStats(S.shape,S.gridCm,S.overrides);
+  render(); updatePanel();
+}
+
+var tolTimer=null;
+function onTolInput(v){
+  S.tol=v; $('tolVal').textContent=v;
+  if(tolTimer) clearTimeout(tolTimer);
+  tolTimer=setTimeout(function(){
+    if(!S.rectCanvas) return;
+    var poly=segmentPalm(S.rectCanvas,S.tol-30);
+    if(!poly){ toast('这个容差下认不出物体，往回调一点',2600); return; }
+    S.rawPoly=poly.slice();S.wrist=null;S.wristAxis=S.kind==='hand'?wristAxis(poly,S.rectW,S.rectH,CFG.PX_PER_CM):null;
+    if(S.wristAxis&&S.wristNorm<98){var cut=cutAtNorm(poly,S.wristAxis,S.wristNorm/100,CFG.PX_PER_CM);if(cut){poly=cut.poly;S.wrist={tCut:cut.tCut,axis:S.wristAxis};}}
+    S.poly=poly; S.confirmed=false;S.manualShape=false;S.overrides={}; S.undoStack=[];
+    rebuild();
+  },420);
+}
+
+/* 手腕线位置：0% = 切到指尖，100% = 一点都不切。
+   滑块改了要重切轮廓并重算，所以做个短防抖，拖动时才不会卡。 */
+var wristTimer=null;
+function onWristInput(v){
+  if(!S.wristAxis||!S.rawPoly){
+    toast('这一张没有可调的手腕线，点【涂抹修边】擦掉多余前臂',3000);
+    return;
+  }
+  S.wristNorm=v; S.confirmed=false;updatePanel();
+  $('wristVal').textContent=(v>=98)?'不切':(v+'%');
+  if(wristTimer) clearTimeout(wristTimer);
+  wristTimer=setTimeout(function(){
+    if(v>=98){S.poly=S.rawPoly.slice();S.wrist=null;S.overrides={};S.undoStack=[];rebuild();return;}
+    var cut=cutAtNorm(S.rawPoly,S.wristAxis,S.wristNorm/100,CFG.PX_PER_CM);
+    if(!cut){ toast('这个位置切不了，往右调一点',2400); return; }
+    S.wrist={tCut:cut.tCut,axis:S.wristAxis};
+    S.poly=cut.poly;
+    S.overrides={}; S.undoStack=[];
+    rebuild();
+  },220);
+}
+
+function setFilter(f){
+  S.filter=f;
+  var fs=$('filterSeg').children;
+  for(var i=0;i<fs.length;i++) fs[i].classList.toggle('on',fs[i].getAttribute('data-f')===f);
+  render();
+}
+
+function undo(){
+  if(!S.undoStack.length){ toast('没有可以撤销的改动了',2200); return; }
+  var last=S.undoStack.pop();
+  if(last.prev===undefined) delete S.overrides[last.key];
+  else S.overrides[last.key]=last.prev;
+  S.stat=gridStats(S.shape,S.gridCm,S.overrides);
+  render(); updatePanel();
+}
+
+/* ---------------- 编辑器：调纸边 / 描轮廓 ---------------- */
+var ED={mode:null,img:null,pts:[],w:0,h:0,scale:1,drag:-1};
+
+function defaultQuad(w,h){
+  var mx=w*0.12, my=h*0.12;
+  return [[mx,my],[w-mx,my],[w-mx,h-my],[mx,h-my]];
+}
+
+function openEditor(mode){
+  var img=(mode==='corner')?S.srcCanvas:S.rectCanvas;
+  if(!img){ toast('还没有照片',2200); return; }
+  hideDiag();
+  ED.mode=mode; ED.img=img; ED.drag=-1;ED.history=[];ED.fresh=false;ED.dirty=false;
+  ED.placeholder=mode==='corner'&&!S.corners;
+  $('paperOrientation').style.display=mode==='corner'?'flex':'none';
+  $('btnEditUndo').style.display=mode==='trace'?'block':'none';
+  if(mode==='corner'){
+    var q=S.corners;
+    var land=S.landscape===null?(q?dist(q[0].x,q[0].y,q[1].x,q[1].y)>dist(q[1].x,q[1].y,q[2].x,q[2].y):img.width>img.height):S.landscape;
+    $('paperDirection').value=land?'landscape':'portrait';
+  }
+  var maxW=Math.min(620,window.innerWidth-80);
+  var maxH=Math.min(window.innerHeight-280,560);
+  var sc=Math.min(maxW/img.width,maxH/img.height);
+  ED.scale=sc;
+  var cw=Math.max(80,Math.round(img.width*sc)), chh=Math.max(80,Math.round(img.height*sc));
+  var ec=$('editCanvas');
+  ec.width=cw; ec.height=chh; ec.style.width=cw+'px'; ec.style.height=chh+'px';
+  ED.w=cw; ED.h=chh;
+  if(mode==='corner'){
+    ED.pts=S.corners?S.corners.map(function(p){return [p.x*sc,p.y*sc];}):defaultQuad(cw,chh);
+    $('editTitle').textContent='拖动四个角，套住白纸的四条边';
+    $('editHint').textContent='四点必须对准真实 A4 的左上 → 右上 → 右下 → 左下；不能框到桌面。若没有自动纸框，必须亲手拖动四角，不能直接确认默认框。纸角不在照片里时请重拍。';
+  }else{
+    /* 逐点模式只用于整条重描。不能把自动轮廓压成少数控制点后
+       又当成精细轮廓保存；局部遗漏改用涂抹修边。 */
+    ED.pts=[];ED.fresh=true;
+    $('editTitle').textContent='沿物体边缘依次点一圈';
+    $('editHint').textContent='这会重新画整条轮廓。沿边缘依次点一圈，至少 3 点，画错可撤回。只需补一点边缘时请取消，改用【涂抹修边】；不画直接完成会保留原轮廓。';
+  }
+  drawEditor();
+  $('editSheet').classList.add('on');
+}
+
+function drawEditor(){
+  var ec=$('editCanvas'), c=ctx2d(ec), i;
+  c.clearRect(0,0,ED.w,ED.h);
+  c.drawImage(ED.img,0,0,ED.w,ED.h);
+  if(ED.mode==='trace'&&ED.pts.length>=3){
+    c.fillStyle='rgba(239,159,39,.30)';
+    c.beginPath(); c.moveTo(ED.pts[0][0],ED.pts[0][1]);
+    for(i=1;i<ED.pts.length;i++) c.lineTo(ED.pts[i][0],ED.pts[i][1]);
+    c.closePath(); c.fill();
+  }
+  if(ED.pts.length>=2){
+    c.strokeStyle=(ED.mode==='corner')?'#378ADD':'#B15F0A';
+    c.lineWidth=3; c.lineJoin='round'; c.lineCap='round';
+    c.beginPath(); c.moveTo(ED.pts[0][0],ED.pts[0][1]);
+    for(i=1;i<ED.pts.length;i++) c.lineTo(ED.pts[i][0],ED.pts[i][1]);
+    if(ED.mode==='corner') c.closePath();
+    c.stroke();
+  }
+  var many=ED.pts.length>60;
+  for(i=0;i<ED.pts.length;i++){
+    if(many){
+      c.beginPath(); c.arc(ED.pts[i][0],ED.pts[i][1],4,0,Math.PI*2);
+      c.fillStyle=(ED.mode==='corner')?'#185FA5':'#B15F0A'; c.fill();
+      continue;
+    }
+    c.beginPath(); c.arc(ED.pts[i][0],ED.pts[i][1],13,0,Math.PI*2);
+    c.fillStyle='rgba(255,255,255,.92)'; c.fill();
+    c.strokeStyle=(ED.mode==='corner')?'#185FA5':'#B15F0A'; c.lineWidth=3; c.stroke();
+    c.fillStyle='#2C2C2A'; c.font='500 13px sans-serif';
+    c.textAlign='center'; c.textBaseline='middle';
+    if(ED.mode==='corner'||i===ED.drag)c.fillText(String(i+1),ED.pts[i][0],ED.pts[i][1]);
+  }
+}
+
+function editorPos(e){
+  var r=$('editCanvas').getBoundingClientRect();
+  return {x:e.clientX-r.left,y:e.clientY-r.top};
+}
+
+function pointSegmentDistance(p,a,b){
+  var dx=b[0]-a[0],dy=b[1]-a[1],den=dx*dx+dy*dy;
+  var t=den?clamp(((p.x-a[0])*dx+(p.y-a[1])*dy)/den,0,1):0;
+  return dist(p.x,p.y,a[0]+t*dx,a[1]+t*dy);
+}
+$('editCanvas').addEventListener('pointerdown',function(e){
+  var p=editorPos(e),best=-1,bd=ED.mode==='corner'?34:18;
+  ED.history.push(ED.pts.map(function(p){return p.slice();}));
+  for(var i=0;i<ED.pts.length;i++){
+    var d=dist(p.x,p.y,ED.pts[i][0],ED.pts[i][1]);if(d<bd){bd=d;best=i;}
+  }
+  ED.drag=best;
+  if(best<0&&ED.mode==='trace'){
+    var insert=-1,sd=22;
+    if(!ED.fresh&&ED.pts.length>=3)for(i=0;i<ED.pts.length;i++){
+      var dd=pointSegmentDistance(p,ED.pts[i],ED.pts[(i+1)%ED.pts.length]);if(dd<sd){sd=dd;insert=i+1;}
+    }
+    var np=[clamp(p.x,0,ED.w),clamp(p.y,0,ED.h)];
+    if(insert>=0){ED.pts.splice(insert,0,np);ED.dirty=true;}
+    else if(ED.fresh||ED.pts.length<3){ED.pts.push(np);ED.dirty=true;}
+    else{ED.history.pop();toast('要补点，请点在轮廓线上；要重新描，点【重来】',2800);}
+    drawEditor();return;
+  }
+  if(best<0&&ED.mode==='corner'){
+    bd=1e9;for(i=0;i<ED.pts.length;i++){var d2=dist(p.x,p.y,ED.pts[i][0],ED.pts[i][1]);if(d2<bd){bd=d2;ED.drag=i;}}
+  }
+  if(ED.drag>=0){ED.dragStart=ED.pts[ED.drag].slice();$('editCanvas').setPointerCapture(e.pointerId);e.preventDefault();drawEditor();}
+});
+$('editCanvas').addEventListener('pointermove',function(e){
+  if(ED.drag<0)return;var p=editorPos(e);
+  if(ED.mode==='trace'&&ED.dragStart&&dist(p.x,p.y,ED.dragStart[0],ED.dragStart[1])>3)ED.dirty=true;
+  if(ED.mode==='corner'&&ED.dragStart&&dist(p.x,p.y,ED.dragStart[0],ED.dragStart[1])>3)ED.placeholder=false;
+  ED.pts[ED.drag]=[clamp(p.x,0,ED.w),clamp(p.y,0,ED.h)];drawEditor();e.preventDefault();
+});
+$('editCanvas').addEventListener('pointerup',function(){ED.drag=-1;drawEditor();});
+$('editCanvas').addEventListener('pointercancel',function(){ED.drag=-1;drawEditor();});
+
+async function confirmEditor(){
+  if(ED.mode==='corner'){
+    if(ED.pts.length!==4){toast('需要四个角',2200);return;}
+    if(ED.placeholder){toast('这是默认示意框，不是真实纸边。请拖动四角到 A4 纸角；纸角没拍全就重拍',5000);return;}
+    var k=1/ED.scale,q=ED.pts.map(function(p){return {x:p[0]*k,y:p[1]*k};});
+    if(!validPaperQuad(q,S.srcCanvas.width,S.srcCanvas.height)){toast('四角不能交叉、重合或排成一条线；请按左上、右上、右下、左下放点',4500);return;}
+    var horizontal=(dist(q[0].x,q[0].y,q[1].x,q[1].y)+dist(q[3].x,q[3].y,q[2].x,q[2].y))/2;
+    var vertical=(dist(q[1].x,q[1].y,q[2].x,q[2].y)+dist(q[0].x,q[0].y,q[3].x,q[3].y))/2;
+    var selectedLandscape=$('paperDirection').value==='landscape';
+    var inferred=horizontal>vertical*1.18?true:(vertical>horizontal*1.18?false:null);
+    if(inferred!==null&&inferred!==selectedLandscape){
+      selectedLandscape=inferred;
+      dlg('纸方向自动纠正：四角显示长边在'+(inferred?'上/下':'左/右')+'，与下拉选择不符；采用四角方向。');
+      toast('已按四角把 A4 方向纠正为'+(inferred?'横放':'竖放'),3000);
+    }
+    S.corners=q;S.landscape=selectedLandscape;S.paperConfirmed=true;
+    S.stat=null;S.shape=null;S.poly=null;S.confirmed=false;updatePanel();closeSheet();
+    try{await runPipeline();}catch(e){busy(false);dlg('识别过程出错: '+e.message);showDiag();}
+  }else{
+    if(!ED.dirty){closeSheet();return;}
+    var k2=1/ED.scale,p=ED.pts.map(function(q){return [q[0]*k2,q[1]*k2];});
+    if(!simplePolygon(p)){toast('轮廓至少需要 3 个点，边线不能交叉或重复；可撤回或重来',4000);return;}
+    S.poly=p;S.rawPoly=p.slice();S.wrist=null;S.wristAxis=S.kind==='hand'?wristAxis(p,S.rectW,S.rectH,CFG.PX_PER_CM):null;
+    S.manualShape=true;S.confirmed=false;S.wristNorm=100;$('wrist').value=100;$('wristVal').textContent='不切';$('tol').disabled=true;
+    S.overrides={};S.undoStack=[];closeSheet();rebuild();aftershape();
+  }
+}
+
+function closeSheet(){ $('editSheet').classList.remove('on'); }
+
+/* 局部修边：用涂抹掩膜代替手机上拥挤的多边形控制点。
+   编辑完成后重新追踪轮廓；显示轮廓和数格统计仍共用同一个多边形。 */
+var BR={mask:null,ctx:null,mode:'add',mm:6,zoom:1,fitWidth:300,
+        history:[],dirty:false,pointer:null,last:null,pan:null};
+function brushDraw(){
+  if(!BR.mask||!S.rectCanvas)return;
+  var cv=$('brushCanvas'),c=cv.getContext('2d');
+  c.clearRect(0,0,cv.width,cv.height);
+  c.drawImage(S.rectCanvas,0,0);
+  c.save();c.globalAlpha=0.38;c.drawImage(BR.mask,0,0);c.restore();
+}
+function brushMode(mode){
+  if(['add','erase','pan'].indexOf(mode)<0)return;
+  BR.mode=mode;
+  Array.prototype.forEach.call($('brushModes').children,function(b){b.classList.toggle('on',b.getAttribute('data-brush')===mode);});
+  $('brushCanvas').style.cursor=mode==='pan'?'grab':'crosshair';
+}
+function brushZoom(z){
+  var wrap=$('brushWrap'),old=BR.zoom;
+  BR.zoom=clamp(z,1,4);
+  var centerX=(wrap.scrollLeft+wrap.clientWidth/2)/old;
+  var centerY=(wrap.scrollTop+wrap.clientHeight/2)/old;
+  $('brushCanvas').style.width=Math.round(BR.fitWidth*BR.zoom)+'px';
+  wrap.scrollLeft=centerX*BR.zoom-wrap.clientWidth/2;
+  wrap.scrollTop=centerY*BR.zoom-wrap.clientHeight/2;
+  $('brushZoomVal').textContent=BR.zoom+'×';
+}
+function openBrush(){
+  if(!S.rectCanvas||!S.poly){toast('请先认出物体轮廓，再局部修边',3000);return;}
+  hideDiag();
+  BR.mask=makeCanvas(S.rectW,S.rectH);BR.ctx=BR.mask.getContext('2d');
+  BR.ctx.fillStyle='#EF9F27';BR.ctx.beginPath();
+  BR.ctx.moveTo(S.poly[0][0],S.poly[0][1]);
+  for(var i=1;i<S.poly.length;i++)BR.ctx.lineTo(S.poly[i][0],S.poly[i][1]);
+  BR.ctx.closePath();BR.ctx.fill();
+  BR.history=[];BR.dirty=false;BR.pointer=null;BR.last=null;BR.pan=null;
+  BR.mm=6;BR.zoom=1;BR.fitWidth=Math.min(window.innerWidth-58,520);
+  $('brushModes').querySelector('[data-brush="add"]').textContent=S.kind==='hand'?'补进手部':'补进物体';
+  $('brushSize').value=6;$('brushSizeVal').textContent='6 mm';
+  var cv=$('brushCanvas');cv.width=S.rectW;cv.height=S.rectH;
+  cv.style.width=Math.round(BR.fitWidth)+'px';cv.style.height='auto';
+  brushMode('add');$('brushZoomVal').textContent='1×';
+  $('brushSheet').classList.add('on');
+  $('brushWrap').scrollLeft=0;$('brushWrap').scrollTop=0;
+  brushDraw();
+}
+function brushPos(e){
+  var cv=$('brushCanvas'),r=cv.getBoundingClientRect();
+  return {x:clamp((e.clientX-r.left)*cv.width/r.width,0,cv.width-1),
+          y:clamp((e.clientY-r.top)*cv.height/r.height,0,cv.height-1)};
+}
+function brushStroke(a,b){
+  var c=BR.ctx;c.save();
+  c.globalCompositeOperation=BR.mode==='erase'?'destination-out':'source-over';
+  c.strokeStyle='#EF9F27';c.lineWidth=BR.mm*CFG.PX_PER_CM/10;
+  c.lineCap='round';c.lineJoin='round';
+  c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();c.restore();
+  BR.dirty=true;brushDraw();
+}
+var brushCanvas=$('brushCanvas');
+brushCanvas.addEventListener('pointerdown',function(e){
+  if(!BR.mask)return;
+  BR.pointer=e.pointerId;brushCanvas.setPointerCapture(e.pointerId);
+  if(BR.mode==='pan'){
+    var wrap=$('brushWrap');BR.pan={x:e.clientX,y:e.clientY,left:wrap.scrollLeft,top:wrap.scrollTop};
+  }else{
+    BR.history.push(BR.ctx.getImageData(0,0,BR.mask.width,BR.mask.height));
+    if(BR.history.length>5)BR.history.shift();
+    BR.last=brushPos(e);brushStroke(BR.last,BR.last);
+  }
+  e.preventDefault();
+});
+brushCanvas.addEventListener('pointermove',function(e){
+  if(BR.pointer!==e.pointerId)return;
+  if(BR.mode==='pan'&&BR.pan){
+    var wrap=$('brushWrap');wrap.scrollLeft=BR.pan.left+BR.pan.x-e.clientX;
+    wrap.scrollTop=BR.pan.top+BR.pan.y-e.clientY;
+  }else if(BR.last){var p=brushPos(e);brushStroke(BR.last,p);BR.last=p;}
+  e.preventDefault();
+});
+function brushEnd(e){if(BR.pointer===e.pointerId){BR.pointer=null;BR.last=null;BR.pan=null;}}
+brushCanvas.addEventListener('pointerup',brushEnd);
+brushCanvas.addEventListener('pointercancel',brushEnd);
+$('brushModes').onclick=function(e){var b=e.target.closest('button');if(b)brushMode(b.getAttribute('data-brush'));};
+$('brushSize').oninput=function(){BR.mm=+this.value;$('brushSizeVal').textContent=BR.mm+' mm';};
+$('brushZoomOut').onclick=function(){brushZoom(BR.zoom-1);};
+$('brushZoomIn').onclick=function(){brushZoom(BR.zoom+1);};
+$('brushUndo').onclick=function(){if(!BR.history.length){toast('没有可撤销的笔画',1800);return;}
+  BR.ctx.putImageData(BR.history.pop(),0,0);BR.dirty=true;brushDraw();};
+$('brushCancel').onclick=function(){$('brushSheet').classList.remove('on');BR.mask=null;};
+$('brushOk').onclick=function(){
+  if(!BR.dirty){$('brushSheet').classList.remove('on');BR.mask=null;return;}
+  var w=BR.mask.width,h=BR.mask.height,d=BR.ctx.getImageData(0,0,w,h).data;
+  var mask=new Uint8Array(w*h);for(var i=0,j=3;i<mask.length;i++,j+=4)mask[i]=d[j]>=127?1:0;
+  var r=labelComponents(mask,w,h),bi=-1,bn=0,second=0;
+  for(i=0;i<r.count;i++){
+    var sz=r.sizes[i].n;if(sz>bn){second=bn;bn=sz;bi=i;}else if(sz>second)second=sz;
+  }
+  if(bi<0||bn<CFG.AREA_MIN*CFG.PX_PER_CM*CFG.PX_PER_CM*0.35){toast('保留下来的手形太小，请撤销或重新修边',3500);return;}
+  if(second>Math.max(200,bn*0.01)){toast('有笔画没连到手形主体，先用【补进】把它接上',3600);return;}
+  var pw=w+2,pad=new Uint8Array((w+2)*(h+2));
+  for(var y=0;y<h;y++)for(var x=0;x<w;x++)if(r.lab[y*w+x]===bi)pad[(y+1)*pw+x+1]=1;
+  var outline=traceOutline(pad,pw,h+2);
+  if(outline.length<12){toast('修边后的轮廓无法闭合，请撤销并重试',3200);return;}
+  var pts=outline.map(function(p){return [p[0]-1,p[1]-1];});
+  var poly=simplifyClosed(pts,1.2);
+  if(poly.length<3||!simplePolygon(poly)){toast('修边后的边线交叉，请撤销并重试',3500);return;}
+  S.poly=poly;S.rawPoly=poly.slice();S.wrist=null;S.wristAxis=null;S.wristNorm=100;
+  S.manualShape=true;S.confirmed=false;S.overrides={};S.undoStack=[];
+  $('wrist').value=100;$('wrist').disabled=true;$('wristVal').textContent='修边后';$('tol').disabled=true;
+  $('brushSheet').classList.remove('on');BR.mask=null;
+  rebuild();aftershape();
+};
+
+/* ---------------- 结果卡片 ---------------- */
+function rrectPath(c,x,y,w,h,r){
+  c.moveTo(x+r,y); c.lineTo(x+w-r,y); c.quadraticCurveTo(x+w,y,x+w,y+r);
+  c.lineTo(x+w,y+h-r); c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  c.lineTo(x+r,y+h); c.quadraticCurveTo(x,y+h,x,y+h-r);
+  c.lineTo(x,y+r); c.quadraticCurveTo(x,y,x+r,y);
+}
+
+/* 把结果图（白纸 + 手掌轮廓 + 上色格子 + 网格 + 标号）画进卡片。
+   以前这里画的是整格实心方块、单色手掌 —— 卡片上看不出轮廓形状。
+   既然要"看到自己手掌在格子纸上的轮廓"，卡片就得跟主界面是同一张图。
+   做法：临时把绘制上下文换成卡片 ctx，直接复用 drawCells / drawGrid。 */
+function paintFigure(c,x,y,boxW,boxH){
+  var RW=S.rectW, RH=S.rectH;
+  if(!RW||!RH) return {s:1};
+  var s=Math.min(boxW/RW,boxH/RH);
+  var ox=x+(boxW-RW*s)/2, oy=y+(boxH-RH*s)/2;
+  var oldCtx=vctx, oldS=S.viewScale;
+  vctx=c; S.viewScale=s;
+  c.save();
+  c.translate(ox,oy); c.scale(s,s);
+  paintPaperContents(s);
+  drawCoords(s);
+  c.restore();
+  c.strokeStyle='#D5D3CC'; c.lineWidth=2;
+  c.strokeRect(ox,oy,RW*s,RH*s);
+  vctx=oldCtx; S.viewScale=oldS;
+  return {s:s};
+}
+
+function buildCard(){
+  if(!S.stat||!S.shape||!S.confirmed){ toast('请先核对轮廓并确认结果',2600); return; }
+  var W=1240,H=1754;
+  var cv=$('cardCanvas');
+  cv.width=W; cv.height=H;
+  var c=ctx2d(cv), st=S.stat, i;
+  c.fillStyle='#FFFFFF'; c.fillRect(0,0,W,H);
+  c.textAlign='left'; c.textBaseline='top';
+  c.fillStyle='#2C2C2A'; c.font='500 48px sans-serif';
+  c.fillText('正面轮廓面积估测',64,56);
+  c.fillStyle='#8A8880'; c.font='400 26px sans-serif';
+  c.fillText(new Date().toLocaleDateString('zh-CN')+'　格子大小 '+st.gridCm+'cm',64,120);
+
+  paintFigure(c,64,170,1112,1020);
+
+  var y=1230;
+  c.fillStyle='#2C2C2A'; c.font='500 30px sans-serif';
+  c.fillText('满格',64,y);
+  c.fillText('不满格',300,y);
+  c.fillText('合计',536,y);
+  c.font='500 54px sans-serif';
+  c.fillStyle='#B15F0A';
+  c.fillText(String(st.full),64,y+40);
+  c.fillStyle='#5F5E5A';
+  c.fillText(String(st.part),300,y+40);
+  c.fillStyle='#2C2C2A';
+  c.fillText(fmt(st.teachCells,1)+' 格',536,y+40);
+
+  c.fillStyle='#B15F0A'; c.font='400 26px sans-serif';
+  c.fillText('面积单位：平方厘米 cm²',64,y+95);
+
+  var bw=1112;
+  for(i=0;i<CFG.GRIDS.length;i++){
+    var g=CFG.GRIDS[i];
+    /* 手改格子的 key 是「行,列」，只在当前档位下有意义，所以其它档位必须传空表。
+       但当前档位必须带上 S.overrides —— 否则卡片顶部的大字（含手改）和下面这一行
+       （不含手改）会互相矛盾，学生改了格子再看卡片会以为工具坏了。 */
+    var sg=gridStats(S.shape,g,(g===st.gridCm)?S.overrides:{});
+    if(!sg) continue;
+    var ry=y+140+i*66;
+    var sel=(g===st.gridCm);
+    c.fillStyle=sel?'#E6F1FB':'#F3F2EE';
+    c.fillRect(64,ry,bw,56);
+    c.fillStyle=sel?'#185FA5':'#5F5E5A';
+    c.font='500 30px sans-serif';
+    c.fillText(g+'cm 格子',84,ry+13);
+    c.fillStyle='#2C2C2A';
+    c.fillText('满格 '+sg.full+' · 不满格 '+sg.part,300,ry+13);
+    c.font='500 32px sans-serif';
+    c.fillText(fmt(sg.teachArea,1),bw-80,ry+11);
+  }
+  var y2=y+140+CFG.GRIDS.length*66+16;
+  c.fillStyle='#0F6E56'; c.font='400 26px sans-serif';
+  c.fillText('轮廓参考面积：'+fmt(st.exact,1)+' cm²　'+
+    '　实心=满格　斜纹=不满格',64,y2);
+
+  showScreen('card');
+}
+
+function saveCard(){
+  var cv=$('cardCanvas');
+  try{
+    cv.toBlob(function(bl){
+      if(!bl){ toast('这张图存不下来，请用 电源键 + 音量减 截图',3200); return; }
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(bl);
+      a.download='轮廓面积估测_'+new Date().toISOString().slice(0,10)+'.png';
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },3000);
+      toast('如果没弹出保存，用 电源键 + 音量减 截图',3000);
+    },'image/png');
+  }catch(e){
+    toast('这张图存不下来，请用 电源键 + 音量减 截图',3200);
+  }
+}
+
+/* ---------------- 内置示例图（摄像头拍不了时试跑用） ---------------- */
+function makeDemoImage(){
+  var W=1200,H=1600;
+  var cv=makeCanvas(W,H), c=ctx2d(cv);
+  c.fillStyle='#3B3A35'; c.fillRect(0,0,W,H);
+  /* 纸：带一点透视 */
+  var p0=[214,148], p1=[1016,196], p2=[966,1476], p3=[186,1426];
+  var ex=[(p1[0]-p0[0])/840,(p1[1]-p0[1])/840];
+  var ey=[(p3[0]-p0[0])/1188,(p3[1]-p0[1])/1188];
+  c.save();
+  c.transform(ex[0],ex[1],ey[0],ey[1],p0[0],p0[1]);
+  /* 纸面 */
+  c.beginPath();
+  c.moveTo(0,0); c.lineTo(840,0); c.lineTo(840,1188); c.lineTo(0,1188); c.closePath();
+  c.fillStyle='#F7F6F1'; c.fill();
+  c.fillStyle='#E4B294';          /* 剪影色，下面每个形状各自 fill() */
+  /* 手掌剪影。要求：
+     ① 手指向上自然张开、指尖收窄，不能是直角方块
+     ② 指根之间要有"指蹼"（谷底），不能一条缝直通掌心
+     ③ 示例使用轻微旋转的形状；三档误差无需单调，不能据此证明精度。
+     下面这段就是照这三条画的。 */
+  c.save();
+  c.translate(420,780); c.rotate(0.085); c.translate(-420,-780);
+
+  /* 掌心：比正圆更方，边缘带弧度 */
+  c.beginPath();
+  rrectPath(c,252,622,344,324,76);
+  c.fill();
+
+  /* 四指：基节在掌内（保证连体），指尖略窄并向两侧扇开 */
+  var BASE_Y=680;
+  var fingers=[
+    {x:330,len:300,ang:-0.190,bw:74,tw:62},
+    {x:424,len:330,ang:-0.050,bw:78,tw:66},
+    {x:512,len:305,ang: 0.090,bw:74,tw:62},
+    {x:588,len:245,ang: 0.240,bw:66,tw:54}
+  ];
+  function taperFinger(f){
+    var a=f.bw/2, b=f.tw/2, top=-f.len, r=b*0.95;
+    var by=(f.y===undefined)?BASE_Y:f.y;
+    c.save(); c.translate(f.x,by); c.rotate(f.ang);
+    c.beginPath();
+    c.moveTo(-a,0);
+    c.lineTo(-b,top+r);
+    c.quadraticCurveTo(-b,top,-b+r,top);
+    c.lineTo(b-r,top);
+    c.quadraticCurveTo(b,top,b,top+r);
+    c.lineTo(a,0);
+    c.closePath(); c.fill();
+    c.restore();
+  }
+  for(var i=0;i<fingers.length;i++) taperFinger(fingers[i]);
+
+  /* 指蹼：在相邻指根之间补一道上凸的圆拱，谷底不落到掌心 */
+  /* 二次贝塞尔的顶点在 t=0.5 处，y_峰 = (yBase + Cy)/2，据此反推控制点 */
+  function web(x1,x2,peak){
+    var m=(x1+x2)/2, Cy=2*peak-BASE_Y;
+    c.beginPath();
+    c.moveTo(x1,BASE_Y);
+    c.quadraticCurveTo(m,Cy,x2,BASE_Y);
+    c.closePath(); c.fill();
+  }
+  web(371,385,596);
+  web(467,475,602);
+  web(553,555,612);
+
+  /* 拇指：从掌心左下斜出，同样收窄 */
+  taperFinger({x:296,y:840,len:235,ang:-1.15,bw:92,tw:74});
+  c.restore();
+
+  c.restore();
+  /* 加一点颗粒，让它像张照片。
+     用固定种子的伪随机数：同一张示例图每次生成的噪声完全一致，
+     识别出的格数也就固定不变 —— 否则老师两次演示拿到不同数字，会不信这个工具。 */
+  var d=c.getImageData(0,0,W,H), p=d.data;
+  var seed=20260930;
+  var rnd=function(){ seed=(seed*1103515245+12345)&0x7FFFFFFF; return seed/0x7FFFFFFF; };
+  for(var k=0;k<p.length;k+=4){
+    var n=(rnd()-0.5)*14;
+    p[k]=clamp(p[k]+n,0,255);
+    p[k+1]=clamp(p[k+1]+n,0,255);
+    p[k+2]=clamp(p[k+2]+n,0,255);
+  }
+  c.putImageData(d,0,0);
+  return cv;
+}
+
+/* ---------------- 事件绑定 ---------------- */
+/* 【拍一张】【从相册选择】是 <label for="..."> + 屏幕外隐藏的 file input（.sr-only）。
+   label→input 是浏览器原生关联触发，这里不能再调 input.click()，否则会弹两次。 */
+function onPickedFile(input){
+  var f=input.files&&input.files[0];
+  input.value='';
+  if(chooserTimer){clearTimeout(chooserTimer);chooserTimer=null;}
+  if(!f){$('entryStatus').textContent='选择已取消，可以再试一次';return;}
+  $('entryStatus').textContent='已收到照片：'+f.name+'，正在读取';
+  startWithFile(f);
+}
+['fileShoot','filePick','fileShootDirect','filePickDirect'].forEach(function(id){
+  $(id).addEventListener('change',function(){onPickedFile(this);});
+  $(id).addEventListener('cancel',function(){
+    if(chooserTimer){clearTimeout(chooserTimer);chooserTimer=null;}
+    $('entryStatus').textContent='选择已取消，可以再试一次';
+  });
+});
+
+/* 诊断抽屉 */
+$('diagClose').onclick=hideDiag;
+$('btnDiag').onclick=showDiag;   /* 正常跑完也能随时翻看这次的中间数据 */
+$('diagCopy').onclick=function(){
+  var txt=$('diagBody').textContent;
+  var btn=this;
+  function ok(){ btn.textContent='已复制'; setTimeout(function(){ btn.textContent='复制'; },1600); }
+  function fail(){ btn.textContent='请长按文字复制'; setTimeout(function(){ btn.textContent='复制'; },2600); }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(ok,function(){ legacyCopy(txt)?ok():fail(); });
+  }else{
+    legacyCopy(txt)?ok():fail();
+  }
+};
+function legacyCopy(txt){
+  try{
+    var ta=document.createElement('textarea');
+    ta.value=txt; ta.style.position='fixed'; ta.style.left='-9999px';
+    document.body.appendChild(ta); ta.select();
+    var r=document.execCommand('copy');
+    document.body.removeChild(ta); return r;
+  }catch(e){ return false; }
+}
+
+/* 相机/相册到底有没有被打开？判据是"页面有没有切到后台"——
+   真打开了相机或相册，页面必然进入后台；3 秒后页面还亮着，说明什么都没弹出来。 */
+var chooserTimer=null;
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='hidden'&&chooserTimer){ clearTimeout(chooserTimer); chooserTimer=null; }
+});
+function armChooserProbe(e){
+  var id=e.currentTarget.id;
+  $('entryStatus').textContent='网页已收到'+(id==='btnShoot'||id==='fileShoot'||id==='fileShootDirect'?'拍照':'选照片')+'点击，等待系统响应…';
+  if(chooserTimer) clearTimeout(chooserTimer);
+  chooserTimer=setTimeout(function(){
+    chooserTimer=null;
+    if(document.visibilityState!=='visible') return;
+    $('entryStatus').textContent='网页收到了点击。如果系统选择窗口没有出现，请试下面的原生文件框。';
+    $('nativeEntry').open=true;
+  },3000);
+}
+['btnShoot','btnPick','fileShoot','filePick','fileShootDirect','filePickDirect'].forEach(function(id){
+  $(id).addEventListener('click',armChooserProbe);
+});
+
+$('btnDemo').onclick=async function(){
+  S.kind='object';Array.prototype.forEach.call($('kindSeg').children,function(b){b.classList.toggle('on',b.getAttribute('data-kind')==='object');});
+  busy('正在生成示例图…'); await nextTick();
+  await startWithCanvas(makeDemoImage());
+};
+
+$('btnHome').onclick=function(){
+  showScreen('home'); resetState(null);
+  $('areaVal').textContent='--'; $('fullCnt').textContent='--';
+  $('partCnt').textContent='--'; $('cellCnt').textContent='--';
+  $('exactVal').textContent='--';
+};
+$('btnHelp').onclick=function(){ $('helpSheet').classList.add('on'); };
+$('btnHelpClose').onclick=function(){ $('helpSheet').classList.remove('on'); };
+
+$('gridSeg').onclick=function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  setGrid(+b.getAttribute('data-cm'));
+};
+$('viewSeg').onclick=function(e){
+  var b=e.target.closest('button');if(!b)return;
+  var mode=b.getAttribute('data-view');if(mode!=='shape'&&mode!=='grid')return;
+  S.viewMode=mode;
+  Array.prototype.forEach.call(this.children,function(x){x.classList.toggle('on',x===b);});
+  render();
+};
+['pointerdown','pointermove','pointerup','pointercancel'].forEach(function(type){
+  $('viewSeg').addEventListener(type,function(e){e.stopPropagation();});
+});
+$('filterSeg').onclick=function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  setFilter(b.getAttribute('data-f'));
+};
+$('tol').oninput=function(){ onTolInput(+this.value); };
+$('wrist').oninput=function(){ onWristInput(+this.value); };
+$('chkPhoto').onchange=function(){ S.showPhoto=this.checked; render(); };
+$('chkCoord').onchange=function(){ S.showCoord=this.checked; render(); };
+$('chkEdit').onchange=function(){
+  S.editCells=this.checked;
+  if(this.checked){S.viewMode='grid';Array.prototype.forEach.call($('viewSeg').children,function(x){x.classList.toggle('on',x.getAttribute('data-view')==='grid');});}
+  render();
+  toast(this.checked
+    ?'现在点格子会改判定。改错了点【撤销改动】'
+    :'已锁定：点格子只是查看，不会改数字',2800);
+};
+
+$('btnCorners').onclick=function(){ openEditor('corner'); };
+$('btnBrush').onclick=openBrush;
+$('btnTrace').onclick=function(){ openEditor('trace'); };
+$('btnCompare').onclick=function(){ if(!S.stat){ toast('还没有结果',2200); return; } buildCompare(); };
+$('btnUndo').onclick=undo;
+$('btnCard').onclick=buildCard;
+
+$('btnEditCancel').onclick=closeSheet;
+$('btnEditReset').onclick=function(){
+  if(ED.mode==='corner'){ED.pts=defaultQuad(ED.w,ED.h);ED.placeholder=true;}
+  else {ED.history.push(ED.pts.map(function(p){return p.slice();}));ED.pts=[];ED.fresh=true;ED.dirty=true;}
+  drawEditor();
+};
+$('btnEditOk').onclick=confirmEditor;
+$('btnEditUndo').onclick=function(){if(ED.history.length){ED.pts=ED.history.pop();ED.dirty=true;drawEditor();}};
+$('btnVerify').onclick=function(){
+  if(!S.stat||!S.paperConfirmed)return;
+  if(!simplePolygon(S.poly)){toast('轮廓边线交叉，请描轮廓修正',3200);return;}
+  S.confirmed=true;dstage('完成');dlg('用户已核对纸角与物体轮廓；面积为当前轮廓估算。');updatePanel();
+};
+$('kindSeg').onclick=function(e){var b=e.target.closest('button');if(!b)return;S.kind=b.getAttribute('data-kind');
+  Array.prototype.forEach.call(this.children,function(x){x.classList.toggle('on',x===b);});
+  $('tolRow').style.display=S.kind==='hand'?'none':'flex';
+  $('wristRow').style.display='none';
+};
+$('btnCmpClose').onclick=function(){ $('cmpSheet').classList.remove('on'); };
+$('btnCardBack').onclick=function(){ showScreen('work'); };
+$('btnCardSave').onclick=saveCard;
+
+[ 'editSheet','cmpSheet','helpSheet' ].forEach(function(id){
+  $(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); });
+});
+
+window.addEventListener('resize',function(){
+  if(elWork.classList.contains('on')){ resizeView(); render(); }
+});
+window.addEventListener('orientationchange',function(){
+  setTimeout(function(){ if(elWork.classList.contains('on')){ resizeView(); render(); } },260);
+});
+
+updatePanel();
+
+if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1')){
+  navigator.serviceWorker.register('./sw.js').catch(function(e){
+    dlg('离线缓存未启用：'+(e&&e.message||e));
+  });
+}
+
+/* ---------------- 启动自检：内置浏览器预警 ---------------- */
+/* 某些应用内浏览器不处理文件选择；UA 仅能提示环境，不能证明失败原因。 */
+window.__BUILD='v12 · 2026-10-02 · 自动手形试验版';
+(function(){
+  var ua=navigator.userAgent||'';
+  var inApp=/MicroMessenger|QQ\/|DingTalk|Weibo|AlipayClient|Lark|Feishu|Wework/i.test(ua);
+  if(!inApp) return;
+  var w=$('appWarn');
+  w.innerHTML='<b>检测到应用内浏览器标识。</b>'+
+    '如果拍照和相册按钮没有反应，请先试下面的备用入口；'+
+    '备用文件框也无反应时，再尝试用系统浏览器或 Chrome 打开同一份本地 HTML。';
+  w.style.display='block';
+})();
+
+
+
+
+</script>
+</body>
+</html>
