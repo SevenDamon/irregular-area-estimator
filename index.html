@@ -35,15 +35,17 @@ button{font-family:inherit;font-size:inherit;color:inherit;border:none;backgroun
 .big{display:block;width:100%;min-height:64px;border-radius:var(--r);
   background:var(--card);border:1px solid var(--line);
   font-size:19px;font-weight:500;transition:transform .06s}
-/* 触发文件选择的两个按钮必须是 <label>：label→input 是浏览器原生行为，
-   比 JS 调 input.click() 兼容得多。按钮文字需要自己居中 */
+/* 拍照入口沿用已经在安卓实测可用的 label→input；相册直接显示原生 input。 */
 label.big{display:flex;align-items:center;justify-content:center;
   text-align:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
-/* 主按钮使用「屏幕外隐藏 + label」；备用入口保留浏览器原生文件框。
-   ⚠ 不要凭理论改回「铺满按钮」式（position:absolute + w/h:100% + opacity:0 + appearance:none）。
-     同一台安卓设备、同一个浏览器下的 A/B 实测：铺满式点不动，这种写法能正常唤相机。 */
+/* 拍照仍用此前实测可用的隐藏 input；不用透明 input 覆盖按钮。 */
 .sr-only{position:absolute;left:-9999px;top:0;width:1px;height:1px;
   opacity:0;overflow:hidden;pointer-events:none}
+.gallery-primary{text-align:left;background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r);padding:12px 14px}
+.gallery-primary label{display:block;font-size:17px;font-weight:500;margin-bottom:8px}
+.gallery-primary p{font-size:12px;color:var(--ink2);margin:8px 0 0;line-height:1.45}
+.gallery-primary input[type=file]{display:block;width:100%;min-height:44px;font:15px sans-serif}
 .big:active{transform:scale(.985)}
 .big.primary{background:var(--accent);border-color:var(--accent);color:#fff;
   box-shadow:0 2px 0 #0C447C}
@@ -129,6 +131,8 @@ label.big{display:flex;align-items:center;justify-content:center;
 .seg button{flex:1;min-height:38px;border-radius:8px;font-size:14px;color:var(--ink2)}
 .seg button.on{background:var(--card);color:var(--ink);font-weight:500;
   box-shadow:0 1px 2px rgba(0,0,0,.09)}
+#gridSeg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-note{margin:-4px 0 0 71px;font-size:12px;color:var(--ink2);line-height:1.45}
 input[type=range]{flex:1;height:34px;-webkit-appearance:none;background:transparent}
 input[type=range]::-webkit-slider-runnable-track{height:5px;border-radius:3px;background:var(--line2)}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;
@@ -182,17 +186,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;heigh
   transition:.22s;z-index:50;line-height:1.5}
 #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 
-/* ---------- 三档对比 ---------- */
+/* ---------- 五档对比 ---------- */
 .cmp-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
 .cmp-row:last-child{border-bottom:none}
 .cmp-row.sel{background:var(--accent-lt);border-radius:8px;padding:9px 10px}
-.cmp-tag{flex:0 0 52px;font-size:15px;font-weight:500}
-.cmp-num{flex:0 0 96px;text-align:right;font-size:17px;font-weight:500;
+.cmp-tag{flex:0 0 64px;font-size:15px;font-weight:500}
+.cmp-num{flex:0 0 90px;text-align:right;font-size:17px;font-weight:500;
   font-variant-numeric:tabular-nums}
 .cmp-bar{flex:1;height:22px;background:var(--sunk);border-radius:5px;position:relative;overflow:hidden}
 .cmp-fill{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:5px}
 .cmp-fill.dim{background:var(--line2)}
-.cmp-err{flex:0 0 74px;text-align:right;font-size:14px;color:var(--ink2);
+.cmp-err{flex:0 0 82px;text-align:right;font-size:14px;color:var(--ink2);
   font-variant-numeric:tabular-nums}
 .base-line{display:flex;align-items:center;gap:10px;padding:10px 0 4px;
   border-top:2px dashed var(--teal);margin-top:6px}
@@ -255,25 +259,28 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
         <button data-kind="hand" class="on">手</button><button data-kind="object">树叶／纸片</button>
       </div></div><div class="home-btns">
       <label class="big primary" for="fileShoot" id="btnShoot">拍一张</label>
-      <label class="big" for="filePick" id="btnPick">从相册选择</label>
+      <div class="gallery-primary">
+        <label for="filePickDirect">从相册选择（点下面的系统按钮）</label>
+        <input type="file" id="filePickDirect" accept="image/*" aria-label="从相册选择照片">
+        <p>安卓可能先打开文件管理器；可从“图片／图库”进入。照片只在本机处理。</p>
+      </div>
       <input type="file" id="fileShoot" class="sr-only"
              accept="image/*" capture="environment">
-      <input type="file" id="filePick" class="sr-only" accept="image/*">
       <button class="big ghost" id="btnDemo">用示例物体试数格子</button>
     </div>
-    <p class="fallback-tip">按钮没弹出相机或相册时，请打开下面的「备用入口」。</p>
+    <p class="fallback-tip">相册入口现在是浏览器原生文件框；若仍打不开，请试下面不限制文件类型的入口。</p>
     <p class="entry-status" id="entryStatus" role="status">等待选择照片</p>
     <details class="tip" id="nativeEntry">
       <summary>拍照／相册没反应？打开备用入口</summary>
-      <p>直接点浏览器自己的文件框。这一步能区分按钮触发与浏览器文件选择功能是否可用。</p>
+      <p>备用文件框不限制图片类型；如出现文件管理器，请到“图片／图库”选 JPG、PNG 或 WebP。</p>
       <label class="native-title" for="fileShootDirect">直接拍照</label>
       <input type="file" id="fileShootDirect" accept="image/*" capture="environment">
-      <label class="native-title" for="filePickDirect">直接选照片</label>
-      <input type="file" id="filePickDirect" accept="image/*">
+      <label class="native-title" for="filePickAny">从文件管理器选照片（不限文件类型）</label>
+      <input type="file" id="filePickAny">
       <p class="native-note">如果这两个原生文件框也没反应，请记下地址栏开头及浏览器名称。这说明故障发生在网页取得照片之前。</p>
     </details>
     <div class="app-warn" id="appWarn">
-      <b>这是在内置浏览器里打开的，点按钮不会有反应。</b>
+      <b>这是在内置浏览器里打开的，文件选择可能受限制。</b>
       微信 / QQ / 钉钉等内置浏览器可能拦截相机或相册。
       请点右上角「···」→「在浏览器打开」，再用【拍一张】。
     </div>
@@ -287,7 +294,7 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
         <li>别开闪光灯，避免物体或平板在纸上投下大片阴影</li>
       </ul>
     </details>
-    <p class="build" id="build">v12.1 · 2026-10-02 · 自动手形试验版 · 需通过网页地址打开</p>
+    <p class="build" id="build">v12.2 · 2026-10-02 · 自动手形试验版 · 需通过网页地址打开</p>
   </div>
 </section>
 
@@ -325,11 +332,14 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
       <div class="row">
         <label>格子边长</label>
         <div class="seg" id="gridSeg">
+          <button data-cm="0.25">0.25cm</button>
+          <button data-cm="0.5">0.5cm</button>
           <button data-cm="1" class="on">1cm</button>
           <button data-cm="2">2cm</button>
           <button data-cm="3">3cm</button>
         </div>
       </div>
+      <p class="grid-note" id="gridNote" hidden>小格子在手机上很密，可以双指放大查看；格子变细不会消除拍照和纸角误差。</p>
       <div class="row" id="tolRow">
         <label>背景容差（仅其他物体）</label>
         <input type="range" id="tol" min="0" max="60" value="30">
@@ -364,7 +374,7 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
         <button class="sm" id="btnCorners">调整纸边</button>
         <button class="sm" id="btnBrush">涂抹修边</button>
         <button class="sm" id="btnTrace">逐点重描</button>
-        <button class="sm" id="btnCompare">三档对比</button>
+        <button class="sm" id="btnCompare">五档对比</button>
         <button class="sm" id="btnUndo">撤销改动</button>
       </div>
       <button class="big primary" id="btnCard">生成结果卡片</button>
@@ -416,11 +426,11 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
   </div>
 </div>
 
-<!-- ================= 弹层：三档对比 ================= -->
+<!-- ================= 弹层：五档对比 ================= -->
 <div class="sheet" id="cmpSheet">
   <div class="sheet-card">
-    <h2>三档对比：格子边长与估算差异</h2>
-    <p class="hint">边长 1、2、3cm 的格子，每格面积分别是 1、4、9cm²。不满格按 0.5 格估算，结果可能偏大或偏小。</p>
+    <h2>五档对比：格子边长与估算差异</h2>
+    <p class="hint">边长 0.25、0.5、1、2、3cm 的格子，每格面积分别是 0.0625、0.25、1、4、9cm²。不满格按 0.5 格估算，结果可能偏大或偏小。</p>
     <p class="hint" style="margin-top:-8px"><b>中间那条彩色条画的是「离轮廓参考面积差了多远」，条越短，数格结果与当前识别轮廓越接近。</b></p>
     <div id="cmpBody"></div>
     <div class="sheet-btns"><button class="b-plain" id="btnCmpClose">知道了</button></div>
@@ -437,7 +447,7 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
       <li>点【拍一张】或【从相册选择】；四个点必须在真实纸角。没有自动纸框时，先亲手拖动四角；纸角没拍全就重拍</li>
       <li>手形由模型自动识别并自动截腕；A4 纸角若找错，拖动四角到真实纸角后即可重算</li>
       <li>边缘漏识别时，点【涂抹修边】局部补进或擦掉；整条轮廓认错时再用【逐点重描】</li>
-      <li>轮廓贴合后点【确认结果】，再切到【数格子】看满格／不满格，并用 1/2/3cm 比较</li>
+      <li>轮廓贴合后点【确认结果】，再切到【数格子】看满格／不满格，并用五种格子边长比较</li>
       <li>【边缘上色】可选“斜线区分”或“同色填充”；只改变颜色，不改变满格、不满格判定或面积</li>
     </ol>
     <p class="hint" style="margin-top:14px">认错了怎么办：点【调整纸边】拖动四个角；自动手形不完整就重拍。其他物体可以点【描轮廓】手动沿边缘点一圈。</p>
@@ -504,7 +514,7 @@ var CFG = {
   BORDER_TOUCH_PCT: 2.0, // 仅在诊断日志里报告"四角离画面边缘多近"。
                          // ⚠ 只做信息记录，不做判据：实测识别完全正确的照片四角也会贴边(0px)，
                          // 用"贴边"推"纸没拍全"会误判。
-  GRIDS: [1, 2, 3]
+  GRIDS: [0.25, 0.5, 1, 2, 3]
 };
 
 /* ---------------- DOM ---------------- */
@@ -517,6 +527,7 @@ var stage=$('stage'), cellInfo=$('cellInfo');
 function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
 function dist(x1,y1,x2,y2){ var dx=x2-x1, dy=y2-y1; return Math.sqrt(dx*dx+dy*dy); }
 function fmt(v,d){ d=(d===undefined)?1:d; return (Math.round(v*Math.pow(10,d))/Math.pow(10,d)).toFixed(d); }
+function areaDigits(gridCm){ return gridCm<1?2:1; }
 
 /* ---------- 诊断：失败时说清"卡在哪一步" ----------
    上一轮踩过的坑：失败提示只有一句笼统的"读不出来"，只能靠猜原因，
@@ -1982,16 +1993,16 @@ function updatePanel(){
     $('exactVal').textContent='--';
     return;
   }
-  $('areaVal').textContent=fmt(st.teachArea,1);
+  $('areaVal').textContent=fmt(st.teachArea,areaDigits(st.gridCm));
   $('fullCnt').textContent=st.full+' 个';
   $('partCnt').textContent=st.part+' 个';
   $('cellCnt').textContent=fmt(st.teachCells,1)+' 格';
   $('exactVal').textContent=fmt(st.exact,1);
 }
 
-/* ---------------- 三档对比 ---------------- */
+/* ---------------- 五档对比 ---------------- */
 async function buildCompare(){
-  busy('正在算三档…'); await nextTick();
+  busy('正在算五档…'); await nextTick();
   var rows=[], i;
   var maxArea=0;
   for(i=0;i<CFG.GRIDS.length;i++){
@@ -2003,8 +2014,7 @@ async function buildCompare(){
   }
   /* The full mask reference is independent of grid size. */
   var exact=S.areaCm2;
-  /* 条形画的是「离精确值差多少」。
-     画面积本身没用——三档面积本来就都接近精确值，条形会一样长，看不出差别。 */
+  /* 条形画的是「离轮廓参考值差多少」，不把格子变细等同于拍照测量精度。 */
   var maxErr=0;
   for(i=0;i<rows.length;i++){
     var e0=Math.abs(rows[i].teachArea-exact);
@@ -2020,13 +2030,13 @@ async function buildCompare(){
     d.className='cmp-row'+(r.gridCm===S.gridCm?' sel':'');
     d.innerHTML=
       '<div class="cmp-tag">'+r.gridCm+'cm</div>'+
-      '<div class="cmp-num">'+fmt(r.teachArea,1)+'</div>'+
+      '<div class="cmp-num">'+fmt(r.teachArea,areaDigits(r.gridCm))+'</div>'+
       '<div class="cmp-bar"><div class="cmp-fill'+(r.gridCm===S.gridCm?'':' dim')+
         '" style="width:'+wpc+'%"></div></div>'+
-      '<div class="cmp-err">差距 '+fmt(Math.abs(err),1)+'</div>';
+      '<div class="cmp-err">差距 '+fmt(Math.abs(err),2)+'</div>';
     body.appendChild(d);
     var sub=document.createElement('div');
-    sub.style.cssText='font-size:13px;color:#8A8880;text-align:left;padding:0 0 6px 62px';
+    sub.style.cssText='font-size:13px;color:#8A8880;text-align:left;padding:0 0 6px 74px';
     var tot=r.full+r.part;
     var pctFull=tot?Math.round(r.full/tot*100):0;
     sub.textContent='满格 '+r.full+' 个 · 不满格 '+r.part+' 个 · 共 '+
@@ -2036,7 +2046,7 @@ async function buildCompare(){
   var base=document.createElement('div');
   base.className='base-line';
   base.innerHTML='<div class="cmp-tag">轮廓参考</div>'+
-    '<div class="cmp-num">'+fmt(exact,1)+'</div>'+
+    '<div class="cmp-num">'+fmt(exact,2)+'</div>'+
     '<div class="cmp-bar" style="background:transparent"></div>'+
     '<div class="cmp-err">差距 0</div>';
   body.appendChild(base);
@@ -2193,6 +2203,7 @@ function resetState(cv){
   S.overrides={}; S.undoStack=[]; S.zoom=1; S.panX=0; S.panY=0;
   S.areaCm2=0; S.gridCm=1; S.viewMode='shape'; S.tol=CFG.TOL_DEFAULT;
   S.filter='all'; S.showPhoto=true;
+  $('gridNote').hidden=true;
   $('tol').value=CFG.TOL_DEFAULT; $('tolVal').textContent=CFG.TOL_DEFAULT;
   $('wrist').value=100; $('wristVal').textContent='自动';
   $('chkEdit').checked=false;
@@ -2379,6 +2390,7 @@ function showCellInfo(r,c){
 function setGrid(cm){
   if(CFG.GRIDS.indexOf(cm)<0)return;
   S.gridCm=cm;
+  $('gridNote').hidden=cm>=1;
   var gs=$('gridSeg').children;
   for(var i=0;i<gs.length;i++) gs[i].classList.toggle('on',+gs[i].getAttribute('data-cm')===cm);
   /* 格子换档后，之前手动改的格子对应关系就变了，必须清空 */
@@ -2776,19 +2788,19 @@ function buildCard(){
        （不含手改）会互相矛盾，学生改了格子再看卡片会以为工具坏了。 */
     var sg=gridStats(S.shape,g,(g===st.gridCm)?S.overrides:{});
     if(!sg) continue;
-    var ry=y+140+i*66;
+    var ry=y+140+i*58;
     var sel=(g===st.gridCm);
     c.fillStyle=sel?'#E6F1FB':'#F3F2EE';
-    c.fillRect(64,ry,bw,56);
+    c.fillRect(64,ry,bw,52);
     c.fillStyle=sel?'#185FA5':'#5F5E5A';
     c.font='500 30px sans-serif';
     c.fillText(g+'cm 格子',84,ry+13);
     c.fillStyle='#2C2C2A';
     c.fillText('满格 '+sg.full+' · 不满格 '+sg.part,300,ry+13);
     c.font='500 32px sans-serif';
-    c.fillText(fmt(sg.teachArea,1),bw-80,ry+11);
+    c.fillText(fmt(sg.teachArea,areaDigits(g)),bw-80,ry+9);
   }
-  var y2=y+140+CFG.GRIDS.length*66+16;
+  var y2=y+140+CFG.GRIDS.length*58+16;
   c.fillStyle='#0F6E56'; c.font='400 26px sans-serif';
   c.fillText('轮廓参考面积：'+fmt(st.exact,1)+' cm²　'+
     (S.partStyle==='solid'?'边缘同色填充；不满格仍按 0.5 格估算':'实心=满格　斜纹=不满格'),64,y2);
@@ -2832,7 +2844,7 @@ function makeDemoImage(){
   /* 手掌剪影。要求：
      ① 手指向上自然张开、指尖收窄，不能是直角方块
      ② 指根之间要有"指蹼"（谷底），不能一条缝直通掌心
-     ③ 示例使用轻微旋转的形状；三档误差无需单调，不能据此证明精度。
+     ③ 示例使用轻微旋转的形状；各档误差无需单调，不能据此证明精度。
      下面这段就是照这三条画的。 */
   c.save();
   c.translate(420,780); c.rotate(0.085); c.translate(-420,-780);
@@ -2901,17 +2913,16 @@ function makeDemoImage(){
 }
 
 /* ---------------- 事件绑定 ---------------- */
-/* 【拍一张】【从相册选择】是 <label for="..."> + 屏幕外隐藏的 file input（.sr-only）。
-   label→input 是浏览器原生关联触发，这里不能再调 input.click()，否则会弹两次。 */
-function onPickedFile(input){
+/* 拍照沿用 label；相册让用户直接点可见的原生 file input。
+   安卓 content:// 文件先解码再清空 input，以免过早释放选择结果。 */
+async function onPickedFile(input){
   var f=input.files&&input.files[0];
-  input.value='';
   if(chooserTimer){clearTimeout(chooserTimer);chooserTimer=null;}
   if(!f){$('entryStatus').textContent='选择已取消，可以再试一次';return;}
   $('entryStatus').textContent='已收到照片：'+f.name+'，正在读取';
-  startWithFile(f);
+  try{await startWithFile(f);}finally{input.value='';}
 }
-['fileShoot','filePick','fileShootDirect','filePickDirect'].forEach(function(id){
+['fileShoot','fileShootDirect','filePickDirect','filePickAny'].forEach(function(id){
   $(id).addEventListener('change',function(){onPickedFile(this);});
   $(id).addEventListener('cancel',function(){
     if(chooserTimer){clearTimeout(chooserTimer);chooserTimer=null;}
@@ -2943,8 +2954,7 @@ function legacyCopy(txt){
   }catch(e){ return false; }
 }
 
-/* 相机/相册到底有没有被打开？判据是"页面有没有切到后台"——
-   真打开了相机或相册，页面必然进入后台；3 秒后页面还亮着，说明什么都没弹出来。 */
+/* 系统文件选择界面不一定使网页进入后台；超时提示只提供下一步，不据此断言失败。 */
 var chooserTimer=null;
 document.addEventListener('visibilitychange',function(){
   if(document.visibilityState==='hidden'&&chooserTimer){ clearTimeout(chooserTimer); chooserTimer=null; }
@@ -2956,11 +2966,10 @@ function armChooserProbe(e){
   chooserTimer=setTimeout(function(){
     chooserTimer=null;
     if(document.visibilityState!=='visible') return;
-    $('entryStatus').textContent='网页收到了点击。如果系统选择窗口没有出现，请试下面的原生文件框。';
-    $('nativeEntry').open=true;
+    $('entryStatus').textContent='如果系统选择窗口没有出现，可试下方“备用入口”；若已出现，请继续选择照片。';
   },3000);
 }
-['btnShoot','btnPick','fileShoot','filePick','fileShootDirect','filePickDirect'].forEach(function(id){
+['btnShoot','fileShoot','fileShootDirect','filePickDirect','filePickAny'].forEach(function(id){
   $(id).addEventListener('click',armChooserProbe);
 });
 
@@ -3069,7 +3078,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:' || location.hos
 
 /* ---------------- 启动自检：内置浏览器预警 ---------------- */
 /* 某些应用内浏览器不处理文件选择；UA 仅能提示环境，不能证明失败原因。 */
-window.__BUILD='v12.1 · 2026-10-02 · 自动手形试验版';
+window.__BUILD='v12.2 · 2026-10-02 · 自动手形试验版';
 (function(){
   var ua=navigator.userAgent||'';
   var inApp=/MicroMessenger|QQ\/|DingTalk|Weibo|AlipayClient|Lark|Feishu|Wework/i.test(ua);
