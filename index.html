@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#f3f2ee">
+<meta name="theme-color" content="#f7f4ec">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon-192.png" type="image/png">
 <title>不规则图形面积估测器</title>
@@ -27,36 +27,61 @@ button{font-family:inherit;font-size:inherit;color:inherit;border:none;backgroun
 .screen.on{display:flex}
 
 /* ---------- 首页 ---------- */
-#home{align-items:center;justify-content:center;padding:24px;overflow:auto}
-.home-wrap{width:100%;max-width:520px;text-align:center}
-.home-wrap h1{font-size:26px;font-weight:500;margin:0 0 6px;letter-spacing:.5px}
-.home-wrap .sub{color:var(--ink2);font-size:15px;margin:0 0 28px}
-.home-btns{display:flex;flex-direction:column;gap:14px}
-.big{display:block;width:100%;min-height:64px;border-radius:var(--r);
+#home{align-items:center;justify-content:center;padding:24px;overflow:auto;
+  background:radial-gradient(circle at 50% 18%,#fff 0,#f8f5ed 42%,#f0ede4 100%)}
+.home-help{position:absolute;right:18px;top:calc(14px + env(safe-area-inset-top));
+  width:44px;height:44px;border:1px solid #d7d2c6;border-radius:50%;
+  background:rgba(255,255,255,.9);color:#3a4c55;font-size:23px;line-height:1;
+  box-shadow:0 2px 10px rgba(44,44,42,.06)}
+.home-help:active{transform:scale(.94)}
+.home-wrap{width:100%;max-width:420px;text-align:center;margin:auto}
+.home-mark{width:74px;height:74px;display:grid;place-items:center;margin:0 auto 22px;
+  border-radius:22px;background:#fff;box-shadow:0 10px 30px rgba(56,47,31,.10);border:1px solid #ebe5d9}
+.home-mark img{width:56px;height:56px;object-fit:contain}
+.home-wrap h1{font-size:clamp(26px,7vw,34px);font-weight:650;margin:0 0 34px;
+  letter-spacing:.03em;color:#263b44;line-height:1.3}
+.home-kind{margin-bottom:28px}
+.home-kind .seg{max-width:300px;margin:auto;background:#e8e5db;border-radius:13px;padding:4px}
+.home-kind .seg button{min-height:44px;font-size:16px}
+.home-btns{display:flex;flex-direction:column;gap:12px}
+.big{display:block;width:100%;min-height:62px;border-radius:16px;
   background:var(--card);border:1px solid var(--line);
-  font-size:19px;font-weight:500;transition:transform .06s}
+  font-size:18px;font-weight:600;transition:transform .06s}
 /* 主入口沿用 v11 在用户安卓浏览器上实测可用的 label→input。 */
 label.big{display:flex;align-items:center;justify-content:center;
   text-align:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .sr-only{position:absolute;left:-9999px;top:0;width:1px;height:1px;
   opacity:0;overflow:hidden;pointer-events:none}
 .big:active{transform:scale(.985)}
-.big.primary{background:var(--accent);border-color:var(--accent);color:#fff;
-  box-shadow:0 2px 0 #0C447C}
-.big.ghost{background:transparent;border-style:dashed;color:var(--ink2);font-size:17px}
-.fallback-tip{margin:14px 2px 0;font-size:13px;line-height:1.6;color:var(--ink2);text-align:center}
+.big.primary{background:#17618d;border-color:#17618d;color:#fff;
+  box-shadow:0 5px 12px rgba(24,95,145,.18)}
+.home-btns .big:not(.primary):not(.ghost){background:#fff;border-color:#d9d4c8;
+  box-shadow:0 3px 12px rgba(56,47,31,.06)}
+.big.ghost{min-height:44px;background:transparent;border:0;color:#596b72;font-size:14px;font-weight:500}
 /* 版本号：出问题时报给我，我能立刻判断手机上的是不是旧文件 */
-.build{margin:18px 0 0;font-size:11px;letter-spacing:.4px;color:#B4B2A9}
+.build{margin:24px 0 0;font-size:11px;letter-spacing:.4px;color:#96948d}
 /* 微信/QQ 等内置浏览器会静默屏蔽 file input，点按钮必然没反应，必须当场告诉用户 */
 .app-warn{display:none;margin:16px 0 0;padding:13px 16px;border-radius:12px;
   background:#FFF4E0;border:1px solid #E8C88A;color:#7A4B00;
   font-size:14px;line-height:1.65;text-align:left}
 .app-warn b{display:block;margin-bottom:4px;font-size:15px;color:#5C3800}
-.tip{margin-top:26px;text-align:left;background:var(--card);border:1px solid var(--line);
-    border-radius:var(--r);padding:14px 16px;font-size:14px;color:var(--ink2)}
-.tip summary{font-weight:500;color:var(--ink);cursor:pointer;font-size:15px}
-.tip ul{margin:10px 0 0;padding-left:20px}
-.tip li{margin:6px 0}
+.help-list{margin:12px 0 18px;padding-left:22px;color:var(--ink2);font-size:14px;line-height:1.7}
+.help-list li{margin:7px 0}
+.help-section{border-top:1px solid var(--line);padding-top:16px;margin-top:16px}
+.help-section h3{font-size:15px;color:var(--ink);margin:0 0 8px}
+.help-section p{font-size:13px;color:var(--ink2);line-height:1.6;margin:0 0 10px}
+.help-section .sm{border-radius:10px}
+.help-head + .help-section{border-top:0;margin-top:0;padding-top:14px}
+.native-control{position:relative;min-height:48px;display:flex;align-items:center;
+  justify-content:center;margin:8px 0;border:1px solid var(--line);border-radius:10px;
+  background:var(--sunk);font-size:14px;color:var(--ink);overflow:hidden}
+.native-control:active{background:var(--line)}
+.help-head{position:sticky;top:-18px;z-index:2;display:flex;align-items:center;
+  justify-content:space-between;background:var(--card);padding:2px 0 12px;
+  border-bottom:1px solid var(--line)}
+.help-head h2{margin:0}
+.help-head button{width:36px;height:36px;border-radius:50%;background:var(--sunk);
+  font-size:23px;line-height:1}
 
 /* ---------- 诊断抽屉：识别失败时把"到底哪一步挂了"摆出来，不用猜 ---------- */
 #diag{position:fixed;left:0;right:0;bottom:0;z-index:60;display:none;
@@ -126,7 +151,6 @@ label.big{display:flex;align-items:center;justify-content:center;
 .seg button.on{background:var(--card);color:var(--ink);font-weight:500;
   box-shadow:0 1px 2px rgba(0,0,0,.09)}
 #gridSeg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
-.grid-note{margin:-4px 0 0 71px;font-size:12px;color:var(--ink2);line-height:1.45}
 input[type=range]{flex:1;height:34px;-webkit-appearance:none;background:transparent}
 input[type=range]::-webkit-slider-runnable-track{height:5px;border-radius:3px;background:var(--line2)}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;
@@ -236,25 +260,24 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
 #cameraVideo{display:block;width:100%;max-height:65vh;background:#171717;border-radius:10px;object-fit:contain}
 .camera-status{font-size:13px;color:var(--ink2);line-height:1.5;margin:9px 0 0}
 .sheet-btns{flex-wrap:wrap}.sheet-btns button{min-width:90px}
-.entry-status{font-size:13px;color:var(--ink2);margin:8px 0}
-.native-title{display:block;font-size:14px;font-weight:600;margin-top:10px}
-#nativeEntry input[type=file]{display:block;position:static;left:auto;top:auto;opacity:1;
-  pointer-events:auto;width:100%;height:auto;font:15px sans-serif;padding:12px;
-  margin:4px 0 14px;border:1px solid var(--line);border-radius:8px;background:white}
+.entry-status{font-size:13px;color:var(--ink2);margin:12px 0 0;line-height:1.5}
+.entry-status:empty{display:none}
+#nativeEntry input[type=file]{position:absolute;inset:0;width:100%;height:100%;
+  opacity:0;pointer-events:auto;cursor:pointer;font-size:100px}
 #nativeEntry button.sm{display:block;width:100%;margin:8px 0}
 #nativeEntry button[hidden]{display:none}
-.native-note{font-size:13px;color:var(--ink2)}
 </style>
 </head>
 <body>
 
 <!-- ================= 首页 ================= -->
 <section id="home" class="screen on">
+  <button class="home-help" id="btnHomeHelp" type="button" title="使用说明" aria-label="使用说明">?</button>
   <div class="home-wrap">
+    <div class="home-mark" aria-hidden="true"><img src="./icon-192.png" alt=""></div>
     <h1>不规则图形面积估测器</h1>
-    <p class="sub">拍手部照片；必要时校正 A4 四角，手形与面积自动生成</p>
-    <div class="row" style="margin-bottom:18px">
-      <label>测什么</label><div class="seg" id="kindSeg">
+    <div class="home-kind">
+      <div class="seg" id="kindSeg" aria-label="测量对象">
         <button data-kind="hand" class="on">手</button><button data-kind="object">树叶／纸片</button>
       </div></div><div class="home-btns">
       <label class="big primary" for="fileShoot" id="btnShoot">拍一张</label>
@@ -263,37 +286,12 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
       <input type="file" id="filePick" class="sr-only" accept="image/*">
       <button class="big ghost" id="btnDemo">用示例物体试数格子</button>
     </div>
-    <p class="fallback-tip">拍照和相册入口已恢复为 v11 的打开方式。若浏览器仍不响应，可试下方备用入口。</p>
-    <p class="entry-status" id="entryStatus" role="status">等待选择照片</p>
-    <details class="tip" id="nativeEntry">
-      <summary>拍照／相册没反应？打开备用入口</summary>
-      <p>先试下面的原生文件框；也可尝试网页摄像头预览。如出现文件管理器，请到“图片／图库”选 JPG、PNG 或 WebP。</p>
-      <label class="native-title" for="fileShootDirect">直接拍照</label>
-      <input type="file" id="fileShootDirect" accept="image/*" capture="environment">
-      <label class="native-title" for="filePickDirect">直接选照片</label>
-      <input type="file" id="filePickDirect" accept="image/*" aria-label="直接选照片">
-      <button class="sm" id="btnOpenPhotoApi" type="button" hidden>改用系统文件浏览器选照片</button>
-      <label class="native-title" for="filePickAny">从文件管理器选照片（不限文件类型）</label>
-      <input type="file" id="filePickAny">
-      <button class="sm" id="btnCameraLive" type="button">网页摄像头预览（备用）</button>
-      <p class="native-note">如果这两个原生文件框也没反应，请记下地址栏开头及浏览器名称。这说明故障发生在网页取得照片之前。</p>
-    </details>
+    <p class="entry-status" id="entryStatus" role="status" aria-live="polite"></p>
     <div class="app-warn" id="appWarn">
       <b>这是在内置浏览器里打开的，文件选择可能受限制。</b>
-      微信 / QQ / 钉钉等内置浏览器可能拦截相机或相册。
-      请点右上角「···」→「在浏览器打开」，再用【拍一张】。
+      请用手机系统浏览器打开，或点右上角问号查看备用入口。
     </div>
-    <details class="tip">
-      <summary>怎么拍才准（点开看）</summary>
-      <ul>
-        <li>白纸平铺在<strong>深色桌面</strong>上，最好垫一块深色垫板，纸边才认得出来</li>
-        <li>每次放<strong>一个</strong>与白纸有明显色差的物体；测手时，五指自然张开</li>
-        <li>物体要完整留在纸内；测手时只让前臂越过纸边。纸必须是 <strong>21×29.7cm 的 A4</strong></li>
-        <li>从<strong>正上方</strong>拍，尽量让白纸四角完整入镜；遮挡的纸角只能估计，面积误差会增大</li>
-        <li>别开闪光灯，避免物体或平板在纸上投下大片阴影</li>
-      </ul>
-    </details>
-    <p class="build" id="build">v12.4 · 2026-10-02 · 自动手形试验版 · 需通过网页地址打开</p>
+    <p class="build" id="build">v12.5 · 2026-10-02</p>
   </div>
 </section>
 
@@ -301,7 +299,7 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
 <section id="work" class="screen">
   <header class="bar">
     <button class="icon" id="btnHome" title="返回">←</button>
-    <div class="bar-title" id="barTitle">不规则图形面积估测器</div>
+    <div class="bar-title" id="barTitle">面积估测器</div>
     <button class="icon" id="btnDiag" title="这次是怎么算的">ⓘ</button>
     <button class="icon" id="btnHelp" title="帮助">?</button>
   </header>
@@ -338,7 +336,6 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
           <button data-cm="3">3cm</button>
         </div>
       </div>
-      <p class="grid-note" id="gridNote" hidden>小格子在手机上很密，可以双指放大查看；格子变细不会消除拍照和纸角误差。</p>
       <div class="row" id="tolRow">
         <label>背景容差（仅其他物体）</label>
         <input type="range" id="tol" min="0" max="60" value="30">
@@ -452,19 +449,27 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
 <!-- ================= 弹层：帮助 ================= -->
 <div class="sheet" id="helpSheet">
   <div class="sheet-card">
-    <h2>怎么用</h2>
-    <p class="hint">拍照 → 核对 A4 四角 → 先看手形 → 再数格</p>
-    <ol style="font-size:15px;color:var(--ink2);padding-left:22px;line-height:1.9">
-      <li>A4 白纸铺在深色桌面上，放一个手掌、树叶或纸片，正上方拍完整</li>
-      <li>点【拍一张】或【从相册选择】获取照片；四个点必须在真实纸角，纸角没拍全就重拍</li>
-      <li>手形由模型自动识别并自动截腕；A4 纸角若找错，拖动四角到真实纸角后即可重算</li>
-      <li>边缘漏识别时，点【涂抹修边】局部补进或擦掉；整条轮廓认错时再用【逐点重描】</li>
-      <li>轮廓贴合后点【确认结果】，再切到【数格子】看满格／不满格，并用五种格子边长比较</li>
-      <li>【边缘上色】可选“斜线区分”或“同色填充”；只改变颜色，不改变满格、不满格判定或面积</li>
-    </ol>
-    <p class="hint" style="margin-top:14px">认错了怎么办：点【调整纸边】拖动四个角；自动手形不完整就重拍。其他物体可以点【描轮廓】手动沿边缘点一圈。</p>
-    <p class="hint">背景容差仅用于其他物体。纸角被遮挡时请重拍，否则面积误差可能较大。轮廓参考面积不是实物面积的独立真值。不支持透明、反光、带洞物体。</p>
-    <div class="sheet-btns"><button class="b-plain" id="btnHelpClose">知道了</button></div>
+    <div class="help-head"><h2>使用说明</h2><button id="btnHelpX" type="button" aria-label="关闭说明">×</button></div>
+    <div class="help-section">
+      <h3>怎么拍才准</h3>
+      <ol class="help-list">
+        <li>把 21×29.7cm 的 A4 白纸平铺在深色桌面上，四角完整入镜。</li>
+        <li>手掌平放，五指自然张开；每次只放一个物体，尽量与白纸有明显色差。</li>
+        <li>从正上方拍，避免闪光灯、大片阴影；测手时只让前臂越过纸边。</li>
+        <li>核对纸角和蓝色轮廓；识别有误时先重拍，必要时调整纸边或涂抹修边。</li>
+        <li>0.25cm 和 0.5cm 的格子可放大查看；格子变细不会消除拍照误差。</li>
+      </ol>
+    </div>
+    <div class="help-section" id="nativeEntry">
+      <h3>拍照或相册没有反应</h3>
+      <p>可改用下面的入口。如打开文件管理器，请在“图片／图库”中选择照片。</p>
+      <div class="native-control"><span>直接拍照</span><input type="file" id="fileShootDirect" accept="image/*" capture="environment" aria-label="直接拍照"></div>
+      <div class="native-control"><span>直接选照片</span><input type="file" id="filePickDirect" accept="image/*" aria-label="直接选照片"></div>
+      <button class="sm" id="btnOpenPhotoApi" type="button" hidden>改用系统文件浏览器选照片</button>
+      <div class="native-control"><span>从文件管理器选照片</span><input type="file" id="filePickAny" aria-label="从文件管理器选照片"></div>
+      <button class="sm" id="btnCameraLive" type="button">网页摄像头预览</button>
+    </div>
+    <div class="sheet-btns"><button class="b-primary" id="btnHelpClose">关闭说明</button></div>
   </div>
 </div>
 
@@ -1689,8 +1694,8 @@ async function runPipeline(){
     return;
   }
   S.rectCanvas=rc; S.rectW=rc.width; S.rectH=rc.height;
-  dstage('切出手掌');
-  busy('正在切手掌…'); await nextTick();
+  dstage(S.kind==='hand'?'识别手掌':'识别轮廓');
+  busy(S.kind==='hand'?'正在识别手掌…':'正在识别轮廓…'); await nextTick();
   var poly;
   if(S.kind==='hand'){
     /* 先在原照片上认手，避免错误纸角把手与袖子扭曲后再送进模型。 */
@@ -1710,7 +1715,7 @@ async function runPipeline(){
     busy(false);
     dlg('-- 结论: 在校正后的纸面上找不到物体 --');
     dlg('原因: '+(SEG_FAIL||'未识别到可靠轮廓'));
-    toast('没切出可靠轮廓。'+(SEG_FAIL||''),7000);
+    toast('未识别到可靠轮廓。'+(SEG_FAIL||''),7000);
     showDiag();
     /* 手形自动识别失败时不要求课堂上手动描边；保留其他物体的手描入口。 */
     if(S.kind!=='hand')openEditor('trace');
@@ -2215,7 +2220,6 @@ function resetState(cv){
   S.overrides={}; S.undoStack=[]; S.zoom=1; S.panX=0; S.panY=0;
   S.areaCm2=0; S.gridCm=1; S.viewMode='shape'; S.tol=CFG.TOL_DEFAULT;
   S.filter='all'; S.showPhoto=true;
-  $('gridNote').hidden=true;
   $('tol').value=CFG.TOL_DEFAULT; $('tolVal').textContent=CFG.TOL_DEFAULT;
   $('wrist').value=100; $('wristVal').textContent='自动';
   $('chkEdit').checked=false;
@@ -2231,6 +2235,7 @@ function resetState(cv){
 
 async function startWithCanvas(cv){
   if(!DIAG.log.length) dreset();
+  $('helpSheet').classList.remove('on');
   resetState(cv);
   showScreen('work');
   resizeView();
@@ -2402,7 +2407,6 @@ function showCellInfo(r,c){
 function setGrid(cm){
   if(CFG.GRIDS.indexOf(cm)<0)return;
   S.gridCm=cm;
-  $('gridNote').hidden=cm>=1;
   var gs=$('gridSeg').children;
   for(var i=0;i<gs.length;i++) gs[i].classList.toggle('on',+gs[i].getAttribute('data-cm')===cm);
   /* 格子换档后，之前手动改的格子对应关系就变了，必须清空 */
@@ -2956,7 +2960,7 @@ if(typeof window.showOpenFilePicker==='function'){
       await startWithFile(f);
     }catch(e){
       $('entryStatus').textContent=e&&e.name==='AbortError'?'已取消选择照片':
-        '系统文件浏览器未能打开（'+(e&&e.name||'未知错误')+'）。请试上方原生文件框或下方备用入口。';
+        '系统文件浏览器未能打开（'+(e&&e.name||'未知错误')+'）。请点右上角问号查看备用入口。';
     }
   };
 }
@@ -2977,7 +2981,7 @@ $('btnCameraLive').onclick=async function(){
   $('cameraStatus').textContent='正在等待相机权限…';
   $('btnCameraCapture').disabled=true;
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-    $('cameraStatus').textContent='此浏览器没有开放网页摄像头；请试下方“备用入口”的直接拍照。';
+    $('cameraStatus').textContent='此浏览器没有开放网页摄像头；请尝试说明页中的“直接拍照”。';
     return;
   }
   var permissionTimer=setTimeout(function(){
@@ -2998,7 +3002,7 @@ $('btnCameraLive').onclick=async function(){
     $('cameraStatus').textContent=name==='NotAllowedError'||name==='SecurityError'
       ?'相机权限被拒绝。请在浏览器的网站设置和手机应用权限中允许相机，再重试。'
       :name==='NotFoundError'?'未找到可用摄像头。'
-      :'相机无法启动（'+name+'）。请试下方“备用入口”的直接拍照。';
+      :'相机无法启动（'+name+'）。请尝试说明页中的“直接拍照”。';
     $('entryStatus').textContent=$('cameraStatus').textContent;
   }finally{clearTimeout(permissionTimer);}
 };
@@ -3046,13 +3050,12 @@ document.addEventListener('visibilitychange',function(){
   if(document.visibilityState==='hidden'&&chooserTimer){ clearTimeout(chooserTimer); chooserTimer=null; }
 });
 function armChooserProbe(e){
-  var id=e.currentTarget.id;
-  $('entryStatus').textContent='网页已收到'+(id==='fileShoot'||id==='btnShoot'||id==='fileShootDirect'?'拍照':'选照片')+'点击，等待系统响应…';
+  $('entryStatus').textContent='';
   if(chooserTimer) clearTimeout(chooserTimer);
   chooserTimer=setTimeout(function(){
     chooserTimer=null;
     if(document.visibilityState!=='visible') return;
-    $('entryStatus').textContent='如果系统选择窗口没有出现，可试下方“备用入口”；若已出现，请继续选择照片。';
+    $('entryStatus').textContent='没有弹出？点右上角问号查看备用入口。';
   },3000);
 }
 ['btnShoot','btnPick','fileShoot','filePick','fileShootDirect','filePickDirect','filePickAny'].forEach(function(id){
@@ -3067,12 +3070,14 @@ $('btnDemo').onclick=async function(){
 
 $('btnHome').onclick=function(){
   showScreen('home'); resetState(null);
+  $('entryStatus').textContent='';
   $('areaVal').textContent='--'; $('fullCnt').textContent='--';
   $('partCnt').textContent='--'; $('cellCnt').textContent='--';
   $('exactVal').textContent='--';
 };
-$('btnHelp').onclick=function(){ $('helpSheet').classList.add('on'); };
+$('btnHelp').onclick=$('btnHomeHelp').onclick=function(){ $('helpSheet').classList.add('on'); };
 $('btnHelpClose').onclick=function(){ $('helpSheet').classList.remove('on'); };
+$('btnHelpX').onclick=$('btnHelpClose').onclick;
 
 $('gridSeg').onclick=function(e){
   var b=e.target.closest('button'); if(!b) return;
@@ -3164,15 +3169,14 @@ if('serviceWorker' in navigator && (location.protocol==='https:' || location.hos
 
 /* ---------------- 启动自检：内置浏览器预警 ---------------- */
 /* 某些应用内浏览器不处理文件选择；UA 仅能提示环境，不能证明失败原因。 */
-window.__BUILD='v12.4 · 2026-10-02 · 自动手形试验版';
+window.__BUILD='v12.5 · 2026-10-02 · 自动手形试验版';
 (function(){
   var ua=navigator.userAgent||'';
   var inApp=/MicroMessenger|QQ\/|DingTalk|Weibo|AlipayClient|Lark|Feishu|Wework/i.test(ua);
   if(!inApp) return;
   var w=$('appWarn');
   w.innerHTML='<b>检测到应用内浏览器标识。</b>'+
-    '如果拍照和相册按钮没有反应，请先试下面的备用入口；'+
-    '备用文件框也无反应时，再尝试用系统浏览器或 Chrome 打开同一个 HTTPS 网页地址。';
+    '若相机或相册没有反应，请点右上角问号查看备用入口，或用手机系统浏览器打开。';
   w.style.display='block';
 })();
 

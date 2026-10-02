@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="cn.codex.irregulararea"
-    android:versionCode="1"
-    android:versionName="12.4-offline-trial">
+    android:versionCode="2"
+    android:versionName="12.5-offline-trial">
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
