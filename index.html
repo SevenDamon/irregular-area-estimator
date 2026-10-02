@@ -35,16 +35,11 @@ button{font-family:inherit;font-size:inherit;color:inherit;border:none;backgroun
 .big{display:block;width:100%;min-height:64px;border-radius:var(--r);
   background:var(--card);border:1px solid var(--line);
   font-size:19px;font-weight:500;transition:transform .06s}
-/* 相册直接显示原生 input；拍照优先走浏览器摄像头 API。 */
+/* 主入口沿用 v11 在用户安卓浏览器上实测可用的 label→input。 */
 label.big{display:flex;align-items:center;justify-content:center;
   text-align:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.gallery-primary{text-align:left;background:var(--card);border:1px solid var(--line);
-  border-radius:var(--r);padding:12px 14px}
-.gallery-primary label{display:block;font-size:17px;font-weight:500;margin-bottom:8px}
-.gallery-primary p{font-size:12px;color:var(--ink2);margin:8px 0 0;line-height:1.45}
-.gallery-primary input[type=file]{display:block;width:100%;min-height:44px;font:15px sans-serif}
-.gallery-primary button{display:block;width:100%;margin-top:10px}
-.gallery-primary button[hidden]{display:none}
+.sr-only{position:absolute;left:-9999px;top:0;width:1px;height:1px;
+  opacity:0;overflow:hidden;pointer-events:none}
 .big:active{transform:scale(.985)}
 .big.primary{background:var(--accent);border-color:var(--accent);color:#fff;
   box-shadow:0 2px 0 #0C447C}
@@ -246,6 +241,8 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
 #nativeEntry input[type=file]{display:block;position:static;left:auto;top:auto;opacity:1;
   pointer-events:auto;width:100%;height:auto;font:15px sans-serif;padding:12px;
   margin:4px 0 14px;border:1px solid var(--line);border-radius:8px;background:white}
+#nativeEntry button.sm{display:block;width:100%;margin:8px 0}
+#nativeEntry button[hidden]{display:none}
 .native-note{font-size:13px;color:var(--ink2)}
 </style>
 </head>
@@ -260,24 +257,25 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
       <label>测什么</label><div class="seg" id="kindSeg">
         <button data-kind="hand" class="on">手</button><button data-kind="object">树叶／纸片</button>
       </div></div><div class="home-btns">
-      <button class="big primary" id="btnShoot" type="button">打开相机拍一张</button>
-      <div class="gallery-primary">
-        <label for="filePickDirect">从相册选择（点下面的系统按钮）</label>
-        <input type="file" id="filePickDirect" accept="image/*" aria-label="从相册选择照片">
-        <button class="sm" id="btnOpenPhotoApi" type="button" hidden>改用系统文件浏览器选照片</button>
-        <p>安卓可能先打开文件管理器；可从“图片／图库”进入。照片只在本机处理。</p>
-      </div>
+      <label class="big primary" for="fileShoot" id="btnShoot">拍一张</label>
+      <label class="big" for="filePick" id="btnPick">从相册选择</label>
+      <input type="file" id="fileShoot" class="sr-only" accept="image/*" capture="environment">
+      <input type="file" id="filePick" class="sr-only" accept="image/*">
       <button class="big ghost" id="btnDemo">用示例物体试数格子</button>
     </div>
-    <p class="fallback-tip">拍照使用浏览器摄像头；相册可试原生文件框或系统文件浏览器。仍无反应时看下方备用入口。</p>
+    <p class="fallback-tip">拍照和相册入口已恢复为 v11 的打开方式。若浏览器仍不响应，可试下方备用入口。</p>
     <p class="entry-status" id="entryStatus" role="status">等待选择照片</p>
     <details class="tip" id="nativeEntry">
       <summary>拍照／相册没反应？打开备用入口</summary>
-      <p>备用文件框不限制图片类型；如出现文件管理器，请到“图片／图库”选 JPG、PNG 或 WebP。</p>
+      <p>先试下面的原生文件框；也可尝试网页摄像头预览。如出现文件管理器，请到“图片／图库”选 JPG、PNG 或 WebP。</p>
       <label class="native-title" for="fileShootDirect">直接拍照</label>
       <input type="file" id="fileShootDirect" accept="image/*" capture="environment">
+      <label class="native-title" for="filePickDirect">直接选照片</label>
+      <input type="file" id="filePickDirect" accept="image/*" aria-label="直接选照片">
+      <button class="sm" id="btnOpenPhotoApi" type="button" hidden>改用系统文件浏览器选照片</button>
       <label class="native-title" for="filePickAny">从文件管理器选照片（不限文件类型）</label>
       <input type="file" id="filePickAny">
+      <button class="sm" id="btnCameraLive" type="button">网页摄像头预览（备用）</button>
       <p class="native-note">如果这两个原生文件框也没反应，请记下地址栏开头及浏览器名称。这说明故障发生在网页取得照片之前。</p>
     </details>
     <div class="app-warn" id="appWarn">
@@ -295,7 +293,7 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
         <li>别开闪光灯，避免物体或平板在纸上投下大片阴影</li>
       </ul>
     </details>
-    <p class="build" id="build">v12.3 · 2026-10-02 · 自动手形试验版 · 需通过网页地址打开</p>
+    <p class="build" id="build">v12.4 · 2026-10-02 · 自动手形试验版 · 需通过网页地址打开</p>
   </div>
 </section>
 
@@ -458,7 +456,7 @@ select{font:inherit;max-width:100%;padding:8px;border:1px solid var(--line);bord
     <p class="hint">拍照 → 核对 A4 四角 → 先看手形 → 再数格</p>
     <ol style="font-size:15px;color:var(--ink2);padding-left:22px;line-height:1.9">
       <li>A4 白纸铺在深色桌面上，放一个手掌、树叶或纸片，正上方拍完整</li>
-      <li>点【打开相机拍一张】会申请浏览器相机权限；选已有照片可点相册文件框，或尝试系统文件浏览器。四个点必须在真实纸角；纸角没拍全就重拍</li>
+      <li>点【拍一张】或【从相册选择】获取照片；四个点必须在真实纸角，纸角没拍全就重拍</li>
       <li>手形由模型自动识别并自动截腕；A4 纸角若找错，拖动四角到真实纸角后即可重算</li>
       <li>边缘漏识别时，点【涂抹修边】局部补进或擦掉；整条轮廓认错时再用【逐点重描】</li>
       <li>轮廓贴合后点【确认结果】，再切到【数格子】看满格／不满格，并用五种格子边长比较</li>
@@ -2936,7 +2934,7 @@ async function onPickedFile(input){
   $('entryStatus').textContent='已收到照片：'+f.name+'，正在读取';
   try{await startWithFile(f);}finally{input.value='';}
 }
-['fileShootDirect','filePickDirect','filePickAny'].forEach(function(id){
+['fileShoot','filePick','fileShootDirect','filePickDirect','filePickAny'].forEach(function(id){
   $(id).addEventListener('change',function(){onPickedFile(this);});
   $(id).addEventListener('cancel',function(){
     if(chooserTimer){clearTimeout(chooserTimer);chooserTimer=null;}
@@ -2973,7 +2971,7 @@ function closeCamera(){
   $('btnCameraCapture').disabled=true;
   $('cameraSheet').classList.remove('on');
 }
-$('btnShoot').onclick=async function(){
+$('btnCameraLive').onclick=async function(){
   var token=++CAM.token;
   $('cameraSheet').classList.add('on');
   $('cameraStatus').textContent='正在等待相机权限…';
@@ -2982,6 +2980,10 @@ $('btnShoot').onclick=async function(){
     $('cameraStatus').textContent='此浏览器没有开放网页摄像头；请试下方“备用入口”的直接拍照。';
     return;
   }
+  var permissionTimer=setTimeout(function(){
+    if(token===CAM.token&&!CAM.stream)
+      $('cameraStatus').textContent='浏览器尚未返回相机权限结果。可取消后改用首页的“拍一张”原生入口。';
+  },10000);
   try{
     var stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'}}});
     if(token!==CAM.token){stream.getTracks().forEach(function(t){t.stop();});return;}
@@ -2998,7 +3000,7 @@ $('btnShoot').onclick=async function(){
       :name==='NotFoundError'?'未找到可用摄像头。'
       :'相机无法启动（'+name+'）。请试下方“备用入口”的直接拍照。';
     $('entryStatus').textContent=$('cameraStatus').textContent;
-  }
+  }finally{clearTimeout(permissionTimer);}
 };
 $('btnCameraCancel').onclick=closeCamera;
 $('btnCameraCapture').onclick=async function(){
@@ -3045,7 +3047,7 @@ document.addEventListener('visibilitychange',function(){
 });
 function armChooserProbe(e){
   var id=e.currentTarget.id;
-  $('entryStatus').textContent='网页已收到'+(id==='fileShootDirect'?'拍照':'选照片')+'点击，等待系统响应…';
+  $('entryStatus').textContent='网页已收到'+(id==='fileShoot'||id==='btnShoot'||id==='fileShootDirect'?'拍照':'选照片')+'点击，等待系统响应…';
   if(chooserTimer) clearTimeout(chooserTimer);
   chooserTimer=setTimeout(function(){
     chooserTimer=null;
@@ -3053,7 +3055,7 @@ function armChooserProbe(e){
     $('entryStatus').textContent='如果系统选择窗口没有出现，可试下方“备用入口”；若已出现，请继续选择照片。';
   },3000);
 }
-['fileShootDirect','filePickDirect','filePickAny'].forEach(function(id){
+['btnShoot','btnPick','fileShoot','filePick','fileShootDirect','filePickDirect','filePickAny'].forEach(function(id){
   $(id).addEventListener('click',armChooserProbe);
 });
 
@@ -3162,7 +3164,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:' || location.hos
 
 /* ---------------- 启动自检：内置浏览器预警 ---------------- */
 /* 某些应用内浏览器不处理文件选择；UA 仅能提示环境，不能证明失败原因。 */
-window.__BUILD='v12.3 · 2026-10-02 · 自动手形试验版';
+window.__BUILD='v12.4 · 2026-10-02 · 自动手形试验版';
 (function(){
   var ua=navigator.userAgent||'';
   var inApp=/MicroMessenger|QQ\/|DingTalk|Weibo|AlipayClient|Lark|Feishu|Wework/i.test(ua);

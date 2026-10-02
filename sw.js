@@ -1,4 +1,4 @@
-const CACHE = 'area-estimator-v12-20261002-9';
+const CACHE = 'area-estimator-v12-20261002-10';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   './vision_bundle.mjs', './hand_landmarker.task', './magic_touch.tflite',
