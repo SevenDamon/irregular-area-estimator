@@ -42,7 +42,7 @@ Copy-Item -LiteralPath (Join-Path $projectRoot 'icon-192.png') -Destination (Joi
 
 # The APK already contains every model file; its WebView does not need a service worker.
 $html = [IO.File]::ReadAllText((Join-Path $projectRoot 'index.html'))
-$html = $html.Replace('v12.5 · 2026-10-02 · 自动手形试验版', 'v12.5 · 2026-10-02 · 安卓离线试验版')
+$html = $html.Replace('v12.6 · 2026-10-04 · 自动识别试验版', 'v12.6 · 2026-10-04 · 安卓离线试验版')
 $old = "if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1')){"
 $new = "if('serviceWorker' in navigator && location.hostname!=='appassets.androidplatform.net' && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1')){"
 if (-not $html.Contains($old)) { throw 'Could not find service worker guard in index.html' }
